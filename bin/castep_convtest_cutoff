@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# run in directory containing input files for a CASTEP run
+
+first_energy=$1
+final_energy=$2
+energy_step=$3
+
+# auto-determine seed
+if [[ $(ls *.param) -gt 1 ]]; then
+    echo "check the param file"
+    exit 0
+fi
+seed=$(ls *.param | awk 'BEGIN{FS=".param"} {print $1}')
+
+ncores=`nproc --all`
+
+if [ ! -f cut_off_energy.txt ]; then
+	echo "Cutoff Energy [eV]; Total calculated energy per atom [eV]; Time [s]" >> cut_off_energy.txt
+fi
+
+for cutoff in `seq $first_energy $energy_step $final_energy`; do
+	
+	mkdir cut_off_energy_${cutoff}	
+	cp ${seed}.* cut_off_energy_${cutoff}
+	cp *.usp* cut_off_energy_${cutoff}
+	cp *pot* cut_off_energy_${cutoff}
+	
+	cd cut_off_energy_${cutoff}
+	
+	sed -i "s/XYZ/${cutoff}/gi" ${seed}.param
+
+	mpirun -n $ncores castep.mpi $seed
+	
+	# the output format for the energy is different between SOC and not SOC calculations, so here we determine which it is
+	is_soc=`awk '/spin-orbit coupling/ {print $4}' ${seed}.castep`
+
+	# the same goes for non-metallic (fix_occupancy=true) and metallic calculations
+	is_non_metallic=`awk '/non-metallic/ {print}' ${seed}.castep`
+	# this will be empty if the calculations is metallic
+
+	if [ $is_soc == "off" ] && [ `python3 -c "print(int(not '$is_non_metallic'))"` -eq 1 ]; then
+		# calculation is metallic and not spin-orbit coupled
+		energy=`awk '/Final energy/ {print $5}' ${seed}.castep`
+	else
+		energy=`awk '/Final energy/ {print $4}' ${seed}.castep`
+	fi	
+
+	time=`awk '/Total time/ {print $4}' ${seed}.castep`
+
+	# determine number of atoms per UC in order to calculate the total energy per atom
+
+	natoms=`grep "Total number of ions in cell" ${seed}.castep | awk 'BEGIN {FS="="}; {print $2}'`
+	energy_per_atom=`python3 -c "print(float('$energy')/float('$natoms'))"`
+
+	echo $cutoff $energy_per_atom $time >> ../cut_off_energy.txt
+	
+	rm ${seed}.check ${seed}.bands ${seed}.castep_bin
+
+	cd ..
+done
+

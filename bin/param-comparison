@@ -1,0 +1,92 @@
+#!/bin/bash
+
+set -e
+
+color='\033[1\0;31m'
+endcolor='\033[0m'
+
+## test usage is correct
+
+function usage {
+    echo 1>&2
+    echo 1>&2 "Usage: $(basename $0) <seed_ref> <seed>"
+    echo 1>&2
+    echo 1>&2 "Example:"
+    echo 1>&2 "$(basename $0) LiCoO2-gencell LiCoO2"
+    echo 1>&2
+    exit 1
+}
+
+[[ $# -ne 2 ]] && usage
+
+ref=$1 # ref.param
+seed=$2 # seed.param
+
+## checks before proceeding
+
+rm -f $seed.param.cmp
+
+castep_param_clean $ref 1> /dev/null
+castep_param_clean $seed 1> /dev/null
+
+## main
+
+echo -e $color
+echo -e "Comparing $seed.param file with $ref.param file"
+echo -e $endcolor
+
+cp $seed.param $seed.param.cmp
+echo '## added' >> $seed.param.cmp
+
+for key_ref in `cat $ref.param | grep -v '^#' | awk 'BEGIN {FS":"} {print $1}'`;
+do
+    val_ref=`cat $ref.param | sed -n "/^$key_ref /p" | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}'`;
+
+    # Check if the keyword is included in the seed.param (zero, once, many times)
+    if [[ `sed -n "/^$key_ref /p" $seed.param | wc -l` -eq 1 ]]; then
+
+        # Get the value associated with the keyword
+        val_type=`castep -h $key_ref | grep 'Type:' | awk '{print $2}'`
+        val=`cat $seed.param | sed -n "/^$key_ref /p" | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}'`;
+
+        # Check if the values are the same
+        is_same=false
+        if [[ $val_type == 'Boolean' || $val_type == 'String' ]]; then
+            [[ $val == $val_ref ]] && is_same=true
+        elif [[ $val_type == 'Integer' ]]; then
+            [[ $val -eq $val_ref ]] && is_same=true
+        elif [[ $val_type == 'Real' || $val_type == 'Physical' ]]; then
+            (awk "BEGIN {exit ! ($val == $val_ref)}") && is_same=true
+        else
+            echo "Error: Type of value is $val_type"
+            exit 323
+        fi
+        
+        # for debugging
+        #echo "$key_ref"0
+        #echo "$val_type"0
+        #echo "$is_same"0
+        #echo "$val"0
+        #echo "$val_ref"0
+        #echo "-----------------------------"
+
+        # Add the val_ref
+        if [[ $is_same == 'false' ]]; then
+            line=`sed -n "/^$key_ref /p" $seed.param`
+            sed -i -e "/$line/ s/$line/$line ##ref $val_ref/" $seed.param.cmp
+        fi
+            
+    elif [[ `grep -i -w $key_ref $seed.param | wc -l` -le 0 ]]; then
+
+        printf "%-25s : %s\n" $key_ref $val_ref >> $seed.param.cmp
+
+    else
+        echo "Error: there are multiple $key_ref keywords"
+        exit 323
+    fi
+        
+done
+
+cat $seed.param.cmp
+
+exit 0

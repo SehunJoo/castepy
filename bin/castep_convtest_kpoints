@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# run in directory containing input files for a CASTEP run
+# go from least dense (first_spacing) to most dense (final_spacing) grid in increments of spacing_reduction
+
+first_spacing=$1
+final_spacing=$2
+spacing_reduction=$3
+
+ncores=`nproc --all`
+
+# auto-determine seed
+if [[ $(ls *.param) -gt 1 ]]; then
+    echo "check the param file"
+    exit 0
+fi
+seed=$(ls *.param | awk 'BEGIN{FS=".param"} {print $1}')
+
+if [ ! -f kpoints_mp_spacing.txt ]; then
+        echo "K-point grid density [1/Ang]; Total calculated energy per atom [eV]; Time [s]" >> kpoints_mp_spacing.txt
+fi
+
+while [ `python3 -c "print(int($first_spacing >= $final_spacing))"` -eq 1 ]; do
+
+	mkdir spacing_${first_spacing}	
+	cp ${seed}.* spacing_${first_spacing}
+	cp *.usp* spacing_${first_spacing}
+	cp *pot* spacing_${first_spacing}
+	
+	cd spacing_${first_spacing}
+	
+	sed -i "s/AAA/${first_spacing}/gi" ${seed}.cell
+
+	mpirun -n $ncores castep.mpi $seed
+
+	# the output format for the energy is different between SOC and not SOC calculations, so here we determine which it is
+	is_soc=`awk '/spin-orbit coupling/ {print $4}' ${seed}.castep`
+
+	# the same goes for non-metallic (fix_occupancy=true) and metallic calculations
+        is_non_metallic=`awk '/non-metallic/ {print}' ${seed}.castep`
+        # this will be empty if the calculations is metallic
+
+	if [ $is_soc == "off" ] && [ `python3 -c "print(int(not '$is_non_metallic'))"` -eq 1 ]; then
+                # calculation is metallic not spin-orbit coupled
+                energy=`awk '/Final energy/ {print $5}' ${seed}.castep`
+        else
+                energy=`awk '/Final energy/ {print $4}' ${seed}.castep`
+        fi
+	
+	time=`awk '/Total time/ {print $4}' ${seed}.castep`
+
+	natoms=`grep "Total number of ions in cell" ${seed}.castep | awk 'BEGIN {FS="="}; {print $2}'`
+        energy_per_atom=`python3 -c "print(float('$energy')/float('$natoms'))"`
+
+        echo $first_spacing $energy_per_atom $time >> ../kpoints_mp_spacing.txt
+
+	rm ${seed}.check ${seed}.bands ${seed}.castep_bin
+	
+	first_spacing=$(echo $first_spacing $spacing_reduction | awk '{printf "%.3f\n", $1 - $2}')
+
+	cd ..
+done

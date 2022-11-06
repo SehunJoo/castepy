@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e
+
+for file in `ls *.castep`; do
+    echo $file
+    grep "<-- SCF" $file | head -n 4
+    grep "<-- SCF" $file | tail -n 1
+done
+    

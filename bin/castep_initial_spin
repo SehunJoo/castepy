@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e
+
+for file in `ls *.castep`; do
+    echo $file
+    #sed -n '/* Electronic Parameters */,/* Electronic Minimization Parameters */p' $file | head -n -1
+
+    sed -n '/Initial magnetic/,/xx/p' $file | tail -n 1
+    sed -n '/Initial magnetic/,/xx/p' $file
+done
+    

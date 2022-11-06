@@ -1,0 +1,72 @@
+#!/bin/bash
+
+set -e
+
+color='\033[1\0;31m'
+endcolor='\033[0m'
+
+## test usage is correct
+
+function usage {
+    echo 1>&2
+    echo 1>&2 "Usage: $(basename $0) <seed>"
+    echo 1>&2
+    echo 1>&2 "Example:"
+    echo 1>&2 "$(basename $0) LiCoO2"
+    echo 1>&2 "$(basename $0) auto"
+    echo 1>&2
+    exit 1
+}
+
+[[ $# -ne 1 ]] && usage
+
+## set the input variables 
+
+seed=$1
+
+if [[ $seed == "auto" ]]; then
+    if ! ls *.param &>/dev/null; then
+        echo 1>&2 "*.param files not found"
+        exit 1
+    else
+        nparam=$(ls *.param | wc -l)
+        [[ $nparam -gt 1 ]] && echo 1>&2 "too many *.param files detected ..." && ls *.param && exit 1
+        [[ $nparam -eq 1 ]] && seed=`ls *.param | awk 'BEGIN {FS=".param"} {print $1}'`
+    fi
+fi
+
+## checks before proceeding
+
+rm -f $seed-default.param
+rm -f $seed-default.param.*
+
+## main
+
+echo -e $color
+echo -e "Generating $seed-default.param file ..."
+echo -e $endcolor
+
+## loop over (keyword and value) pairs in seed.param
+
+for key in $(awk 'BEGIN {FS=":"} {print $1}' $seed.param | awk '{print tolower($1)}')
+do
+    default=$(castep -h $key | grep 'Default value : ' | awk 'BEGIN {FS=": "} {print tolower($2)}')
+    val=$default
+
+    [[ $key == 'spin_polarized' ]] && val='true'
+    [[ $key == 'spin_orbit_coupling' ]] && val='false'
+    [[ $key == 'cut_off_energy' ]] && val='-1'
+    [[ $key == 'fine_grid_scale' ]] && val='-1'
+    [[ $key == 'finite_basis_corr' ]] && val='0'
+    [[ $key == 'elec_energy_tol' ]] && val='10^-5'
+    [[ $key == 'mix_spin_amp' ]] && val='2.0'
+    [[ $key == 'nextra_bands' ]] && key='perc_extra_bands' && val='20'
+    
+
+    [[ $val == $default ]] && printf "%-25s : %s\n" $key "$default" >> $seed-default.param
+    [[ $val != $default ]] && printf "%-25s : %s\n" $key "$val ## $default" >> $seed-default.param
+done
+
+cat $seed-default.param
+
+exit 0
