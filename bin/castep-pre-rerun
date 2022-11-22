@@ -1,0 +1,28 @@
+#!/bin/bash
+
+set -e
+
+seed=$(ls *.param | awk 'BEGIN {FS=".param"} {print $1}')
+dir=$(pwd | awk 'BEGIN{FS="/"}{print $NF}' | awk 'BEGIN{FS="_"}{print $1}')
+newdir=$(echo $dir | awk 'BEGIN{FS="opt"}{n = $2 + 1; printf "%sopt%d", $1, n}')
+
+
+echo "current directory: $dir"
+echo "new directory: $newdir"
+echo
+
+# make new directory
+
+mkdir ../$newdir;
+ls -l --color ../
+echo
+
+# copy input files
+
+cp $seed{.cell,.param} ../$newdir
+ls -l --color ../$newdir
+echo
+
+pwd
+
+exit 0

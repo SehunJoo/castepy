@@ -1,0 +1,60 @@
+#!/bin/bash
+
+set -e
+
+color='\033[1\0;31m'
+endcolor='\033[0m'
+
+function usage {
+    echo 1>&2 -e $color
+    echo 1>&2 -e "usage: $(basename $0) [task]"
+    echo 1>&2 -e $endcolor
+    echo 1>&2 "$(basename $0)  singlepoint"
+    echo 1>&2 "$(basename $0)  geometryoptimization"
+    echo 1>&2
+    exit 1
+}
+
+if [ $# -lt 1 ]; then
+    usage
+fi
+
+task=$1
+
+for seed in $(ls *.param | awk 'BEGIN {FS=".param"} {print $1}')
+do
+    echo "$seed.param"
+
+    if [[ $task == "singlepoint" ]]
+    then
+        sed -i 's/^task [[:print:]]*/task                      : singlepoint/' $seed.param
+
+        sed -i 's/^write_checkpoint [[:print:]]*/write_checkpoint          : all/' $seed.param
+        sed -i 's/^write_cst_esp [[:print:]]*/write_cst_esp             : true/' $seed.param
+        sed -i 's/^write_bands [[:print:]]*/write_bands               : true/' $seed.param
+
+        sed -i '/backup_interval [[:print:]]*/d' $seed.param
+        echo "backup_interval           : 82800" >> $seed.param
+        sed -i '/continuation [[:print:]]*/d' $seed.param
+        echo "continuation              : default" >> $seed.param
+
+    elif [[ $task == "geometryoptimization" ]]
+    then
+        sed -i 's/^task [[:print:]]*/task                      : geometryoptimization/' $seed.param
+
+        sed -i 's/^write_checkpoint [[:print:]]*/write_checkpoint          : all/' $seed.param
+        sed -i 's/^write_cst_esp [[:print:]]*/write_cst_esp             : false/' $seed.param
+        sed -i 's/^write_bands [[:print:]]*/write_bands               : false/' $seed.param
+
+        sed -i '/backup_interval [[:print:]]*/d' $seed.param
+        echo "backup_interval           : 82800" >> $seed.param
+        sed -i '/continuation [[:print:]]*/d' $seed.param
+        echo "continuation              : default" >> $seed.param
+    else
+        echo "$task is not available"
+        exit 1
+    fi
+
+done
+
+exit 0

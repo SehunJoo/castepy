@@ -1,0 +1,33 @@
+#!/bin/bash
+
+set -e
+
+seed=$(ls *.param | awk 'BEGIN {FS=".param"} {print $1}')
+dir=$(pwd | awk 'BEGIN{FS="/"}{print $NF}')
+newdir=${dir}_spe
+
+echo "current directory: $dir"
+echo "new directory: $newdir"
+echo
+
+# make new directory
+
+mkdir ../$newdir;
+ls -l --color ../
+echo
+
+# copy input files
+
+cp $seed{.cell,.param} ../$newdir
+ls -l --color ../$newdir
+echo
+
+# modify param file
+
+cd ../$newdir
+pwd
+
+param-task singlepoint
+
+
+exit 0

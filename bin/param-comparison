@@ -26,8 +26,8 @@ seed=$2 # seed.param
 
 rm -f $seed.param.cmp
 
-castep_param_clean $ref 1> /dev/null
-castep_param_clean $seed 1> /dev/null
+param-clean $ref 1> /dev/null
+param-clean $seed 1> /dev/null
 
 ## main
 

@@ -1,0 +1,72 @@
+#!/bin/bash
+
+set -e
+
+color='\033[1\0;31m'
+endcolor='\033[0m'
+
+function usage {
+    echo 1>&2 -e $color
+    echo 1>&2 -e "usage: $(basename $0) [on/off/tidy]"
+    echo 1>&2 -e $endcolor
+    echo 1>&2 "$(basename $0)  on"
+    echo 1>&2 "$(basename $0)  off"
+    echo 1>&2 "$(basename $0)  tidy"
+    echo 1>&2
+    exit 1
+}
+
+# check before proceeding
+
+if [ $# -lt 1 ]; then
+    usage
+fi
+
+case $1 in
+    on | off | tidy)
+        hubbardu=$1
+        ;;
+    *)
+        echo "invalid option: $1"
+        usage
+        ;;
+esac
+
+# main
+
+for seed in $(ls *.cell | awk 'BEGIN {FS=".cell"} {print $1}')
+do
+    echo "$seed.cell"
+
+    if [[ $hubbardu == "on" ]]
+    then
+        sed -i '/^%BLOCK HUBBARD_U/,/^%ENDBLOCK HUBBARD_U/d' $seed.cell
+        (
+            echo ""
+            echo "%BLOCK HUBBARD_U"
+            echo "%ENDBLOCK HUBBARD_U"
+        ) >> $seed.cell
+
+    elif [[ $hubbardu == "off" ]]
+    then
+        sed -i '/^%BLOCK HUBBARD_U/,/^%ENDBLOCK HUBBARD_U/d' $seed.cell
+        sed -i '/^#%BLOCK HUBBARD_U/,/^#%ENDBLOCK HUBBARD_U/d' $seed.cell
+
+    elif [[ $hubbardu == "tidy" ]]
+    then
+        ncols=$(sed '/^%BLOCK HUBBARD_U/,/^%ENDBLOCK HUBBARD_U/!d;//d' $seed.cell | head -n 1 | awk '{print NF}')
+        if [[ $ncols -eq 4 ]]
+        then
+            sed '/^%BLOCK HUBBARD_U/,/^%ENDBLOCK HUBBARD_U/d' $seed.cell > $seed.cell.temp
+            (
+                echo ""
+                echo "%BLOCK HUBBARD_U"
+                sed -n -e '/^%BLOCK HUBBARD_U/, /^%ENDBLOCK HUBBARD_U/p' $seed.cell  | sed '/%/,/%/!d;//d' | awk '{printf "    %s %s %.2f\n", $1, $3, $4}' | uniq
+                echo "%ENDBLOCK HUBBARD_U"
+            ) >> $seed.cell.temp
+            mv $seed.cell.temp $seed.cell
+        fi
+    fi
+done
+
+exit 0

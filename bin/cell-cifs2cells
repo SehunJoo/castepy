@@ -1,0 +1,19 @@
+#!/bin/bash
+
+set -e
+
+for f in $(ls *.cif)
+do
+    seed=$(echo $f | awk 'BEGIN{FS=".cif"}{print $1}')
+    cif2cell -f $seed.cif -p castep -o $seed.cell
+    sed -i '/^#[[:print:]]*/d' $seed.cell
+done
+
+cell-pot off
+cell-sym off
+
+cell-kpoints on
+cell-sym on
+cell-pot on
+cell-pressure on
+cell-clean

@@ -1,0 +1,161 @@
+#!/bin/bash
+
+set -e
+
+color='\033[1\0;31m'
+endcolor='\033[0m'
+
+## test usage is correct
+
+function usage {
+    echo 1>&2
+    echo 1>&2 "Usage: $(basename $0) <seed>"
+    echo 1>&2
+    echo 1>&2 "Example:"
+    echo 1>&2
+    echo 1>&2 "nohup $(basename $0) seed & echo $! > .pid"
+    echo 1>&2 "nohup $(basename $0) auto & echo $! > .pid"
+    echo 1>&2
+    exit 1
+}
+
+[[ $# -ne 1 ]] && usage
+
+## set the input variables 
+
+seed=$1
+
+if [[ $seed == "auto" ]]; then
+    if ! ls *.param &>/dev/null; then
+        echo 1>&2 "*.param files not found"
+        exit 1
+    else
+        nparam=$(ls *.param | wc -l)
+        [[ $nparam -gt 1 ]] && echo 1>&2 "too many *.param files detected ..." && ls *.param && exit 1
+        [[ $nparam -eq 1 ]] && seed=`ls *.param | awk 'BEGIN {FS=".param"} {print $1}'`
+    fi
+fi
+
+##
+run_castep() {
+
+    while :
+    do
+        echo "run castep"
+
+        counter_err=1
+        counter_done=0
+
+        spawn-single -jmpinp 40 -jnt A -seed auto -command castep_relax_surface
+    
+        counter_err=$(ls *.err 2> /dev/null | wc -l)
+        counter_done=$(ls DONE 2> /dev/null | wc -l)
+
+        if [[ $counter_err -eq 0 ]] && [[ $counter_done -eq 1 ]]; then
+            break
+        else
+            cat *.err
+            rm -f *.err DONE .spawnpids.*
+        fi
+    done
+}
+
+## main
+
+dir1="geomopt1_express"
+
+if [[ ! -d $dir1 ]]; then
+
+    mkdir $dir1
+    cp $seed{.cell,.param} $dir1
+    
+    cd $dir1
+    
+    param-tol express
+    run_castep
+    
+    cd ../
+    
+    echo "geomopt1_express done"
+else
+    if [[ ! -f $dir1/DONE ]]; then
+
+        cd $dir1
+
+        run_castep
+
+        cd ../
+
+        echo "geomopt1_express done"
+    else
+        echo "skip $dir1"
+    fi
+fi
+
+
+# geometry optimization with default setting
+
+dir2="geomopt2_default"
+
+if [[ ! -d $dir2 ]]; then
+
+    mkdir $dir2
+    cp $dir1/$seed{.cell,.param} $dir2
+    
+    cd $dir2
+    
+    param-tol default
+    run_castep
+    
+    cd ../
+    
+    echo "geomopt2_default done"
+else
+    if [[ ! -f $dir2/DONE ]]; then
+
+        cd $dir2
+
+        run_castep
+
+        cd ../
+
+        echo "geomopt2_default done"
+    else
+        echo "skip $dir2"
+    fi
+fi
+
+
+# geometry optimization with default setting
+
+dir3="geomopt3"
+
+if [[ ! -d $dir3 ]]; then
+
+    mkdir $dir3
+    cp $dir2/$seed{.cell,.param} $dir3
+    
+    cd $dir3
+    
+    param-tol ultrafine
+    run_castep
+    
+    cd ../
+    
+    echo "geomopt3 done"
+else
+    if [[ ! -f $dir3/DONE ]]; then
+
+        cd $dir3
+
+        run_castep
+
+        cd ../
+
+        echo "geomopt3 done"
+    else
+        echo "skip $dir3"
+    fi
+fi
+
+exit 0

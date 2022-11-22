@@ -29,7 +29,7 @@ while [ `python3 -c "print(int($first_spacing >= $final_spacing))"` -eq 1 ]; do
 	
 	cd spacing_${first_spacing}
 	
-	sed -i "s/AAA/${first_spacing}/gi" ${seed}.cell
+	sed -i "s/KPOINTS_MP_SPACING [[:print:]]*/KPOINTS_MP_SPACING ${first_spacing}/gi" ${seed}.cell
 
 	mpirun -n $ncores castep.mpi $seed
 
