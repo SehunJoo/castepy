@@ -1,0 +1,109 @@
+#!/bin/bash
+
+color='\033[1\0;31m'
+endcolor='\033[0m'
+
+function usage {
+    echo 1>&2 -e $color
+    echo 1>&2 -e "usage: $(basename $0) [keyword] [first] [last] [increment]" 2>&1
+    echo 1>&2 -e $endcolor
+    echo 1>&2 "$(basename $0)  kpoints_mp_spacing  0.07 0.01 -0.005"
+    echo 1>&2 "$(basename $0)  cut_off_energy      300  1000  50"
+    echo 1>&2 "$(basename $0)  fine_grid_scale     2.0  3.0  0.1"
+    echo 1>&2 
+    exit 1
+}
+
+if [ $# -ne 4 ]; then
+    usage
+fi
+
+# run in directory containing input files for a CASTEP run
+
+keyword=$1
+first=$2
+last=$3
+increment=$4
+
+## auto-determine seed
+
+if [[ $(ls *.param | wc -l) -gt 1 ]]; then
+    echo "check the param file"
+    exit 0
+fi
+seed=$(ls *.param | awk 'BEGIN{FS=".param"} {print $1}')
+
+ncores=$(nproc --all)
+
+[[ $keyword == "kpoints_mp_spacing" ]] && keyword=${keyword^^}
+
+
+## Main
+
+[[ $keyword == "cut_off_energy" ]] && values=$(seq -f "%.0f" $first $increment $last)
+[[ $keyword == "fine_grid_scale" ]] && values=$(seq -f "%.1f" $first $increment $last)
+[[ $keyword == "KPOINTS_MP_SPACING" ]] && values=$(seq -f "%.3f" $first $increment $last)
+
+echo "keyword   :"$keyword
+echo "first     :"$first
+echo "last      :"$last
+echo "increment :"$increment
+echo "values    :"$values
+
+if [ ! -f $keyword.csv ]; then
+	printf '%s,%s,%s\n' $keyword 'energy(eV/atom)' 'time(s)' >> ../$keyword.csv
+fi
+
+for value in $values; do
+
+    dir="${keyword}_${value}"
+
+	mkdir $dir
+
+	cp $seed{.cell,.param} *.usp* *pot* $dir
+
+	cd $dir
+
+    [[ $keyword == "cut_off_energy"     ]] && sed -i "s/$keyword [[:print:]]*/$keyword : $value/gi" $seed.param
+    [[ $keyword == "fine_grid_scale"    ]] && sed -i "s/$keyword [[:print:]]*/$keyword : $value/gi" $seed.param
+    [[ $keyword == "KPOINTS_MP_SPACING" ]] && sed -i "s/$keyword [[:print:]]*/$keyword $value/gi" $seed.cell
+    
+
+    ## run castep
+
+	mpirun -n $ncores castep.mpi $seed
+
+
+    ## parsing energy and time
+	
+	# the output format for the energy is different between SOC and not SOC calculations, so here we determine which it is
+	is_soc=$(awk '/spin-orbit coupling/ {print $4}' $seed.castep)
+
+	# the same goes for non-metallic (fix_occupancy=true) and metallic calculations
+	is_non_metallic=$(awk '/non-metallic/ {print}' $seed.castep)
+	# this will be empty if the calculations is metallic
+
+	if [ $is_soc == "off" ] && [ `python3 -c "print(int(not '$is_non_metallic'))"` -eq 1 ]; then
+		# calculation is metallic and not spin-orbit coupled
+		energy=$(awk '/Final energy/ {print $5}' $seed.castep)
+	else
+		energy=$(awk '/Final energy/ {print $4}' $seed.castep)
+	fi	
+
+	time=$(awk '/Total time/ {print $4}' $seed.castep)
+
+	# determine number of atoms per UC in order to calculate the total energy per atom
+
+	natoms=$(grep "Total number of ions in cell" $seed.castep | awk 'BEGIN {FS="="}; {print $2}')
+	energy_per_atom=`python3 -c "print(float('$energy')/float('$natoms'))"`
+
+    ## print the results
+
+	printf '%s,%s,%s\n' $value $energy_per_atom $time >> ../$keyword.csv
+    sed 's/,/\t/g' ../$keyword.csv > ../$keyword.tsv
+	
+	rm -f $seed{.check,.bands,.castep_bin}
+
+	cd ..
+done
+

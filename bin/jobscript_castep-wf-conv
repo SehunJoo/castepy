@@ -1,0 +1,27 @@
+#!/bin/bash -l
+#$ -cwd
+#$ -S /bin/bash
+#$ -m n
+#$ -N castep
+#$ -pe mpi 24
+#$ -l h_rt=48:00:00
+#$ -P Gold
+#$ -A Faraday_FCAT
+#$ -l mem=4G
+##$ -t 1-1
+#$ -ac allow=K
+
+source ~/.bashrc
+
+
+# launch program
+
+#castep-wf-conv  kpoints_mp_spacing  0.07 0.01 -0.005
+#castep-wf-conv  cut_off_energy      300  1000  50
+castep-wf-conv  fine_grid_scale     2.0  3.0  0.1
+
+wait
+
+touch DONE
+echo "Done"
+exit 0
