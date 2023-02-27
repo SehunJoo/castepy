@@ -50,13 +50,25 @@ echo "last      :"$last
 echo "increment :"$increment
 echo "values    :"$values
 
-if [ ! -f $keyword.csv ]; then
-	printf '%s,%s,%s\n' $keyword 'energy(eV/atom)' 'time(s)' >> ../$keyword.csv
+if [ ! -f castep-conv.csv ]; then
+    printf '%s,%s,%s,%s,%s,%s\n' 'cutoff_energy(eV)' 'grid_scale' 'fine_grid_scale' 'kpoint_spacing(A-1)' 'energy(eV/atom)' 'time(s)' >> castep-conv.csv
 fi
 
 for value in $values; do
 
-    dir="${keyword}_${value}"
+    cut=$(sed -n '/^cut_off_energy/p' $seed.param | awk '{printf "%.0f", $3}')
+    gs=$(sed -n '/^grid_scale/p' $seed.param | awk '{printf "%.2f", $3}') 
+    fgs=$(sed -n '/^fine_grid_scale/p' $seed.param | awk '{printf "%.2f", $3}')
+    kpn=$(sed -n '/^KPOINTS_MP_SPACING/p' $seed.cell | awk '{printf "%.3f", $2}')
+
+    [ -z $gs ] && gs='1.75'
+    [ -z $fgs ] && fgs=$gs
+
+    [[ $keyword == "cut_off_energy" ]] && cut=$value
+    [[ $keyword == "fine_grid_scale" ]] && fgs=$value
+    [[ $keyword == "KPOINTS_MP_SPACING" ]] && kpn=$value
+
+    dir="cut${cut}_gs${gs}_fgs${fgs}_kpn${kpn}"
 
 	mkdir $dir
 
@@ -64,9 +76,9 @@ for value in $values; do
 
 	cd $dir
 
-    [[ $keyword == "cut_off_energy"     ]] && sed -i "s/$keyword [[:print:]]*/$keyword : $value/gi" $seed.param
-    [[ $keyword == "fine_grid_scale"    ]] && sed -i "s/$keyword [[:print:]]*/$keyword : $value/gi" $seed.param
-    [[ $keyword == "KPOINTS_MP_SPACING" ]] && sed -i "s/$keyword [[:print:]]*/$keyword $value/gi" $seed.cell
+    [[ $keyword == "cut_off_energy"     ]] && sed -i "s/$keyword [[:print:]]*/$keyword : $cut/gi" $seed.param
+    [[ $keyword == "fine_grid_scale"    ]] && sed -i "s/$keyword [[:print:]]*/$keyword : $fgs/gi" $seed.param
+    [[ $keyword == "KPOINTS_MP_SPACING" ]] && sed -i "s/$keyword [[:print:]]*/$keyword $kpn/gi" $seed.cell
     
 
     ## run castep
@@ -74,7 +86,14 @@ for value in $values; do
 	mpirun -n $ncores castep.mpi $seed
 
 
-    ## parsing energy and time
+    ## parsing
+
+    cut=$(grep "plane wave basis set cut-off" $seed.castep | awk 'BEGIN{FS=":"}{print $2}' | awk '{print $1}')
+    gs=$(grep "size of standard grid" $seed.castep | awk 'BEGIN{FS=":"}{print $2}' | awk '{print $1}') 
+    fgs=$(grep "size of   fine   grid" $seed.castep | awk 'BEGIN{FS=":"}{print $2}' | awk '{print $1}')
+    kpn=$(grep "KPOINTS_MP_SPACING" $seed.cell | awk '{print $2}')
+
+    [ -z $fgs ] && fgs=$gs
 	
 	# the output format for the energy is different between SOC and not SOC calculations, so here we determine which it is
 	is_soc=$(awk '/spin-orbit coupling/ {print $4}' $seed.castep)
@@ -95,12 +114,13 @@ for value in $values; do
 	# determine number of atoms per UC in order to calculate the total energy per atom
 
 	natoms=$(grep "Total number of ions in cell" $seed.castep | awk 'BEGIN {FS="="}; {print $2}')
-	energy_per_atom=`python3 -c "print(float('$energy')/float('$natoms'))"`
+	energy_per_atom=$(python3 -c "print(float('$energy')/float('$natoms'))")
+
 
     ## print the results
 
-	printf '%s,%s,%s\n' $value $energy_per_atom $time >> ../$keyword.csv
-    sed 's/,/\t/g' ../$keyword.csv > ../$keyword.tsv
+    printf '%s,%s,%s,%s,%s,%s\n' $cut $gs $fgs $kpn $energy_per_atom $time >> ../castep-conv.csv
+    sed 's/,/\t/g' ../castep-conv.csv > ../castep-conv.tsv
 	
 	rm -f $seed{.check,.bands,.castep_bin}
 

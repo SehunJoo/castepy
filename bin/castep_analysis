@@ -9,11 +9,9 @@ function usage {
     echo 1>&2 -e $color
     echo 1>&2 -e "usage: $(basename $0) [-seed seed]" 2>&1
     echo 1>&2 -e $endcolor
-    echo 1>&2 $(basename $0)  -input
     echo 1>&2 $(basename $0)  -conv
-    echo 1>&2 $(basename $0)  -output
+    echo 1>&2 $(basename $0)  -seed auto 
     echo 1>&2 $(basename $0)  -seed auto -conv
-    echo 1>&2 $(basename $0)  -seed auto -output
     exit 1
 }
 
@@ -25,23 +23,18 @@ fi
 # set defaults
 
 opt_seed='auto'
-opt_input='false'
 opt_conv='false'
-opt_output='false'
 
 while [ $# -ge 1 ] ; do
     case $1 in
         -seed)
             opt_seed=$2; shift 2
             ;;
-        -input)
-            opt_input='true'; shift 1
-            ;;
         -conv)
             opt_conv='true'; shift 1
             ;;
-        -output)
-            opt_output='true'; shift 1
+        -v|--verbose)
+            opt_verbose='true'; shift 1
             ;;
         -h)
             usage
@@ -77,134 +70,463 @@ echo ""
 
 # Parsing input parameters
 
-function input {
+function casplit {
 
-    echo -e $color
-    echo -e "parsing spacegroup ..."
-    echo -e $endcolor
+    # split concatenated castep file
 
-    ## get input parts 
+    echo "split $seed.castep files if concatenated ..."
 
-    input=$(sed -n -r '/^ \*+ Title \*+/,/^\+\-+ MEMORY/p' $seed.castep)
-    #echo "$input"; exit 1
+    rm -f $seed-split*
 
-    ## get input parameters
-    
-    xc_functional=$(echo "$input" | grep "using functional" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
-    sedc_scheme=$(echo "$input" | grep "DFT+D: Semi-empirical dispersion correction" | head -1 | awk 'BEGIN {FS=":"} {print $NF}' | awk '{print $1}')
-    cut_off_energy=$(echo "$input" | grep "plane wave basis set cut-off" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-    finite_basis_corr=$(echo "$input" | grep "finite basis set correction" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-    spin=$(echo "$input" | grep "net spin   of system" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-    spin_polarized=$(echo "$input" | grep "treating system as spin-polarized" | head -1 | awk '{print $4}')
-    metals_method=$(echo "$input" | grep " Method" | head -1 | awk 'BEGIN {FS="with "} {print $2}' | awk 'BEGIN {FS=" treatment"} {print $1}')
-    smearing_width=$(echo "$input" | grep "smearing width" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-    dipole_correction=$(echo "$input" | grep "periodic dipole correction" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
-    dipole_dir=$(echo "$input" | grep "correcting slab dipole in direction" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-    fixed_npw=$(echo "$input" | grep "variable cell method" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
-
-    echo "xc_functional     = $xc_functional"
-    echo "sedc_scheme       = $sedc_scheme"
-    echo "cut_off_energy    = $cut_off_energy"
-    echo "finite_basis_corr = $finite_basis_corr"
-    echo "spin              = $spin"
-    echo "spin_polarized    = $spin_polarized"
-    echo "metals_method     = $metals_method"
-    echo "smearing_width    = $smearing_width"
-    echo "dipole_correction = $dipole_correction"
-    echo "dipole_dir        = $dipole_dir"
-    echo "fixed_npw         = $fixed_npw"
-
-    [[ $xc_functional == 'Perdew Burke Ernzerhof' ]] && xc_functional='PBE'
-    [[ $xc_functional == 'PBE for solids (2008)' ]] && xc_functional='PBESOL'
-    if [[ $spin_polarized == 'spin-polarized' ]]; then
-        spin_polarized='true'
-    elif [[ $spin_polarized == 'spin-polarized' ]]; then
-        spin_polarized='false'
+    if [[ -e $seed.castep ]]; then
+        csplit -s -z -f $seed -b -split-%02d.castep $seed.castep '/CCC   AA    SSS  TTTTT  EEEEE  PPPP/' {*}
+        rm -f $seed-split-00.castep
     fi
-    [[ $metals_method == 'density mixing' ]] && metals_method='dm'
-    [[ $metals_method == 'ensemble DFT' ]] && metals_method='edft'
-
-    ## get input structures
-
-    nions=$(echo "$input" | grep "Total number of ions in cell" | head -1 | awk 'BEGIN {FS="="} {print $2}' | awk '{print $1}')
-    symmops=$(echo "$input" | grep "Number of symmetry operations" | head -1 | awk 'BEGIN {FS="="} {print $2}' | awk '{print $1}')
-    spacegroup=$(echo "$input" | grep "Space group of crystal =" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk 'BEGIN {FS=","};{print $1}' | awk '{print $1}')
-    cell_constraints=$(echo "$input" | grep "Cell constraints" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
-
-    echo "nions             = $nions"
-    echo "symmops           = $symmops"
-    echo "spacegroup        = $spacegroup"
-    echo "cell_constraints  = $cell_constraints"
-
-
-    ## get Hubbard U values
-    if [[ $(echo "$input" | grep "Hubbard U   values by orbital type" | wc -l) -gt 0 ]]; then
-        hubbard='true'
-    else
-        hubbard='NULL'
-    fi
-
-    echo "hubbard           = $hubbard"
-    if [[ $hubbard == 'true' ]]; then
-        echo
-        echo "Hubbard U   values by orbital type"
-        echo "    s       p       d       f"
-        echo "$input" | sed -n '/Hubbard U   values by orbital type/,/xx/p' | sed '/|--/,/xx/!d;//d' | head -n $nions \
-                      | grep -v "0.00000    0.00000    0.00000    0.00000" | awk '{print $1, $3, $4, $5, $6, $7}' | uniq
-    fi
-
-    kpoints_mp_spacing=$(grep "KPOINTS_MP_SPACING" $seed.cell | awk '{print $2}')
-    kpoints_mp_grid=$(echo "$input" | grep "MP grid size for SCF calculation is" | head -1 | awk 'BEGIN {FS="is"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
-
-    echo "kpoints_mp_grid   = $kpoints_mp_grid"
-
-    
-    echo -e $color
-    echo -e "summary - input ..."
-    echo -e $endcolor
-
-    (
-        printf "%s\t" "xc_functional"
-        printf "%s\t" "sedc_scheme"
-        printf "%s\t" "cut_off_energy"
-        printf "%s\t" "finite_basis_corr"
-        printf "%s\t" "spin"
-        printf "%s\t" "spin_polarized"
-        printf "%s\t" "metals_method"
-        printf "%s\t" "smearing_width"
-        printf "%s\t" "dipole_correction"
-        printf "%s\t" "dipole_dir"
-        printf "%s\t" "fixed_npw"
-        printf "%s\t" "nions"
-        printf "%s\t" "symmops"
-        printf "%s\t" "spacegroup"
-        printf "%s\t" "cell_constraints"
-        printf "%s\t" "hubbard"
-        printf "%s\t" "kpoints_mp_spacing"
-        printf "%s\t" "kpoints_mp_grid"
-        printf "\n"
-        printf "%s\t" "$xc_functional"
-        printf "%s\t" "$sedc_scheme"
-        printf "%s\t" "$cut_off_energy"
-        printf "%s\t" "$finite_basis_corr"
-        printf "%s\t" "$spin"
-        printf "%s\t" "$spin_polarized"
-        printf "%s\t" "$metals_method"
-        printf "%s\t" "$smearing_width"
-        printf "%s\t" "$dipole_correction"
-        printf "%s\t" "$dipole_dir"
-        printf "%s\t" "$fixed_npw"
-        printf "%s\t" "$nions"
-        printf "%s\t" "$symmops"
-        printf "%s\t" "$spacegroup"
-        printf "%s\t" "$cell_constraints"
-        printf "%s\t" "$hubbard"
-        printf "%s\t" "$kpoints_mp_spacing"
-        printf "%s\t" "$kpoints_mp_grid"
-        printf "\n"
-    ) > input.dat
-    cat input.dat
 }
+
+function parsing {
+
+    # loop over splitted ${seed}.castep file
+
+    header='true'
+    for f in $(ls $seed-split-*.castep)
+    do
+        seedsplit=${f%%.castep}
+
+        echo "parsing $seedsplit.castep file ..."
+
+        ## get input from ${seed}.castep file
+        input=''
+        input=$(sed -n -r '/^ \*+ Title \*+/,/^\+\-+ MEMORY/p' $seedsplit.castep)
+        #echo "$input"; exit 1
+
+        [[ -z $input ]] && echo "Input parameters not found ..." && exit 1
+
+
+        ## parse General Parameters
+
+        task=''
+        calculate_stress=''
+
+        task=$(echo "$input" | grep "type of calculation" | head -n 1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
+        calculate_stress=$(echo "$input" | grep "stress calculation" | head -n 1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
+
+        ## parse Exchange-Correlation Parameters
+
+        xc_functional=''
+        sedc_scheme=''
+
+        xc_functional=$(echo "$input" | grep "using functional" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
+        sedc_scheme=$(echo "$input" | grep "DFT+D: Semi-empirical dispersion correction" | head -1 | awk 'BEGIN {FS=":"} {print $NF}' | sed -e 's/^ *//g' -e 's/ *$//g')
+
+        if [[ $xc_functional == 'Perdew Burke Ernzerhof' ]]; then
+            xc_functional='PBE'
+        elif [[ $xc_functional == 'PBE for solids (2008)' ]]; then
+            xc_functional='PBESOL'
+        fi
+
+        ## parse Basis Set Parameters
+
+        cut_off_energy=''
+        grid_scale=''
+        fine_grid_scale=''
+        finite_basis_corr=''
+
+        cut_off_energy=$(echo "$input" | grep "plane wave basis set cut-off" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        grid_scale=$(echo "$input" | grep "size of standard grid" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        fine_grid_scale=$(echo "$input" | grep "size of   fine   grid" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        finite_basis_corr=$(echo "$input" | grep "finite basis set correction" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+
+        ## parse Electronic Parameters
+
+        nelectrons=''
+        spin=''
+        spin_polarized=''
+        nbands=''
+
+        nelectrons=$(echo "$input" | grep "number of  electrons" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        spin=$(echo "$input" | grep "net spin   of system" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        spin_polarized=$(echo "$input" | grep "treating system as spin-polarized" | head -1 | awk '{print $4}')
+        nbands=$(echo "$input" | grep "number of bands" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+
+        if [[ $spin_polarized == 'spin-polarized' ]]; then
+            spin_polarized='true'
+        else
+            spin_polarized='false'
+        fi
+
+        ## parse Electronic Minimization Parameters
+
+        metals_method=''
+        elec_energy_tol=''
+        smearing_width=''
+        dipole_correction=''
+        dipole_dir=''
+
+        metals_method=$(echo "$input" | grep " Method" | head -1 | awk 'BEGIN {FS="with "} {print $2}' | awk 'BEGIN {FS=" treatment"} {print $1}')
+        elec_energy_tol=$(echo "$input" | grep 'total energy / atom convergence tol.' | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        smearing_width=$(echo "$input" | grep "smearing width" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        dipole_correction=$(echo "$input" | grep "periodic dipole correction" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
+        dipole_dir=$(echo "$input" | grep "correcting slab dipole in direction" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+
+        if [[ $metals_method == 'density mixing' ]]; then
+            metals_method='dm'
+        elif [[ $metals_method == 'ensemble DFT' ]]; then
+            metals_method='edft'
+        fi
+        [[ -z $dipole_dir ]] && dipole_dir="NaN"
+
+        ## parse Geometry Optimization Parameters
+
+        fixed_npw=''
+        geom_energy_tol=''
+        geom_force_tol=''
+        geom_disp_tol=''
+        geom_stress_tol=''
+
+        fixed_npw=$(echo "$input" | grep "variable cell method" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
+        geom_energy_tol=$(echo "$input" | grep "total energy convergence tolerance" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        geom_force_tol=$(echo "$input" | grep "max ionic |force| tolerance" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        geom_disp_tol=$(echo "$input" | grep "max ionic |displacement| tolerance" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        geom_stress_tol=$(echo "$input" | grep "max |stress component| tolerance" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+
+
+        ## parse Unit Cell
+
+        a=''
+        b=''
+        c=''
+        alpha=''
+        beta=''
+        gamma=''
+        volume=''
+        density=''
+
+        a=$(echo "$input" | grep -w "a =" | head -n 1 | awk 'BEGIN {FS=" a ="} {print $2}' | awk '{print $1}')
+        b=$(echo "$input" | grep -w "b =" | head -n 1 | awk 'BEGIN {FS=" b ="} {print $2}' | awk '{print $1}')
+        c=$(echo "$input" | grep -w "c =" | head -n 1 | awk 'BEGIN {FS=" c ="} {print $2}' | awk '{print $1}')
+        alpha=$(echo "$input" | grep -w "alpha =" | head -n 1 | awk 'BEGIN {FS=" alpha ="} {print $2}' | awk '{print $1}')
+        beta=$(echo "$input" | grep -w "beta  =" | head -n 1 | awk 'BEGIN {FS=" beta  ="} {print $2}' | awk '{print $1}')
+        gamma=$(echo "$input" | grep -w "gamma =" | head -n 1 | awk 'BEGIN {FS=" gamma ="} {print $2}' | awk '{print $1}')
+        volume=$(echo "$input" | grep -w "volume =" | head -n 1 | awk 'BEGIN {FS="[=]"} {print $2}' | awk '{print $1}')
+        density=$(echo "$input" | grep "g/cm^3" | head -n 1 | awk 'BEGIN {FS="="} {print $2}' | awk '{print $1}')
+
+        ## parse Cell Contents
+
+        nions=''
+
+        nions=$(echo "$input" | grep "Total number of ions in cell" | head -1 | awk 'BEGIN {FS="="} {print $2}' | awk '{print $1}')
+
+        ## parse Details of Species
+
+        hubbard=''
+
+        if [[ $(echo "$input" | grep "Hubbard U   values by orbital type" | wc -l) -gt 0 ]]; then
+            hubbard=$(echo "$input" | sed -n '/Hubbard U   values by orbital type/,/xx/p' | sed '/|--/,/xx/!d;//d' | head -n $nions \
+                          | grep -v "0.00000    0.00000    0.00000    0.00000" | awk '{printf "%s:%4.2f\n", $1, $5}' | uniq \
+                          | sed -n 's/^|//p' | sed -z -n 's/\n/ /gp')
+        else
+            hubbard='NaN'
+        fi
+
+        ## parse k-Points for BZ sampling
+
+        kpoints_mp_grid=''
+        kpoints_mp_spacing=''
+
+        kpoints_mp_grid=$(echo "$input" | grep "MP grid size for SCF calculation is" | head -1 | awk 'BEGIN {FS="is"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
+        kpoints_mp_spacing=$(grep "KPOINTS_MP_SPACING" $seed.cell | awk '{print $2}')
+
+
+        ## parse Symmetry and Constraints
+
+        symmops=''
+        spacegroup=''
+        cell_constraints=''
+
+        symmops=$(echo "$input" | grep "Number of symmetry operations" | head -1 | awk 'BEGIN {FS="="} {print $2}' | awk '{print $1}')
+        spacegroup=$(echo "$input" | grep "Space group of crystal =" | head -1 | awk 'BEGIN {FS="[:]|[,]"} {print $2}' | awk '{print $1}')
+        cell_constraints=$(echo "$input" | grep "Cell constraints" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
+
+
+        ## save as tsv
+
+        if [[ $header == 'true' ]]; then        
+            (
+                printf "%s\t" "task"
+
+                printf "%s\t" "xc_functional"
+                printf "%s\t" "sedc_scheme"
+
+                printf "%s\t" "cut_off_energy"
+                printf "%s\t" "grid_scale"
+                printf "%s\t" "fine_grid_scale"
+                printf "%s\t" "finite_basis_corr"
+
+                printf "%s\t" "nelectrons"
+                printf "%s\t" "spin"
+                printf "%s\t" "spin_polarized"
+                printf "%s\t" "nbands"
+
+                printf "%s\t" "metals_method"
+                printf "%s\t" "elec_energy_tol"
+                printf "%s\t" "smearing_width"
+                printf "%s\t" "dipole_correction"
+                printf "%s\t" "dipole_dir"
+
+                printf "%s\t" "fixed_npw"
+                printf "%s\t" "geom_energy_tol"
+                printf "%s\t" "geom_force_tol"
+                printf "%s\t" "geom_disp_tol"
+                printf "%s"   "geom_stress_tol"
+                printf "\n"
+            ) > input-param.tsv
+
+        fi
+            (
+                printf "%s\t" "$task"
+
+                printf "%s\t" "$xc_functional"
+                printf "%s\t" "$sedc_scheme"
+
+                printf "%s\t" "$cut_off_energy"
+                printf "%s\t" "$grid_scale"
+                printf "%s\t" "$fine_grid_scale"
+                printf "%s\t" "$finite_basis_corr"
+
+                printf "%s\t" "$nelectrons"
+                printf "%s\t" "$spin"
+                printf "%s\t" "$spin_polarized"
+                printf "%s\t" "$nbands"
+
+                printf "%s\t" "$metals_method"
+                printf "%s\t" "$elec_energy_tol"
+                printf "%s\t" "$smearing_width"
+                printf "%s\t" "$dipole_correction"
+                printf "%s\t" "$dipole_dir"
+
+                printf "%s\t" "$fixed_npw"
+                printf "%s\t" "$geom_energy_tol"
+                printf "%s\t" "$geom_force_tol"
+                printf "%s\t" "$geom_disp_tol"
+                printf "%s"   "$geom_stress_tol"
+                printf "\n"
+            ) >> input-param.tsv
+
+        if [[ $header == 'true' ]]; then        
+            (
+                printf "%s\t" "a(Å)"
+                printf "%s\t" "b(Å)"
+                printf "%s\t" "c(Å)"
+                printf "%s\t" "α(°)"
+                printf "%s\t" "β(°)"
+                printf "%s\t" "γ(°)"
+                printf "%s\t" "volume(Å**3)"
+                printf "%s\t" "density(g/cc)"
+
+                printf "%s\t" "nions"
+                printf "%s\t" "hubbard"
+                printf "%s\t" "kpoints_mp_spacing"
+                printf "%s\t" "kpoints_mp_grid"
+                printf "%s\t" "symmops"
+                printf "%s\t" "spacegroup"
+                printf "%s"   "cell_constraints"
+                printf "\n"
+            ) > input-cell.tsv
+
+        fi
+            (
+                printf "%s\t" "$a"
+                printf "%s\t" "$b"
+                printf "%s\t" "$c"
+                printf "%s\t" "$alpha"
+                printf "%s\t" "$beta"
+                printf "%s\t" "$gamma"
+                printf "%s\t" "$volume"
+                printf "%s\t" "$density"
+
+                printf "%s\t" "$nions"
+                printf "%s\t" "$hubbard"
+                printf "%s\t" "$kpoints_mp_spacing"
+                printf "%s\t" "$kpoints_mp_grid"
+                printf "%s\t" "$symmops"
+                printf "%s\t" "$spacegroup"
+                printf "%s"   "$cell_constraints"
+                printf "\n"
+            ) >> input-cell.tsv
+
+        [[ $opt_verbose == 'true' ]] && catcsv input-param.tsv && echo
+        [[ $opt_verbose == 'true' ]] && catcsv input-cell.tsv && echo
+
+        # =========================================================================================
+
+
+        ## check if geometry optimization is done successfully
+
+        stat=''
+        if [[ $(tail -20 $seedsplit.castep | grep "Total time          = " | awk '{print $1}') != "Total" ]]; then
+            stat='ongoing'
+        elif [[ $task == 'single point energy' ]]; then
+            stat='NULL'
+        elif [[ $task == 'geometry optimization' ]]; then
+            if [[ $(sed -n '/Geometry optimization/p' $seedsplit.castep | sed -n '/failed/p' | wc -l) -eq 1 ]]; then
+                stat='failed'
+            elif [[ $(sed -n '/Geometry optimization/p' $seedsplit.castep | sed -n '/completed/p' | wc -l) -eq 1 ]]; then
+                stat='completed'
+            else
+                stat='error-checkfile'
+            fi
+        else
+            echo "check task" && exit 1
+        fi
+
+        niter=$(sed -n '/LBFGS: finished iteration/p' $seedsplit.castep | tail -n 1 | awk '{print $4}')
+        [[ -z $niter ]] && niter='NaN'
+
+        ## parse final configuration
+
+        fconfig=''
+        if [[ $task == 'single point energy' ]]; then
+            fconfig=$(cat $seedsplit.castep)
+        elif [[ $task == 'geometry optimization' ]]; then
+            fconfig=$(sed -n '/LBFGS: Final Configuration/,/Total time          =/p' $seedsplit.castep)
+        fi
+        
+        [[ -z $fconfig ]] && (echo "Final Configuration not found ..."; exit 1)
+            
+        ## parse Unit Cell
+
+        a=''
+        b=''
+        c=''
+        alpha=''
+        beta=''
+        gamma=''
+        volume=''
+        density=''
+
+        a=$(echo "$fconfig" | grep -w "a =" | tail -n 1 | awk 'BEGIN {FS=" a ="} {print $2}' | awk '{print $1}')
+        b=$(echo "$fconfig" | grep -w "b =" | tail -n 1 | awk 'BEGIN {FS=" b ="} {print $2}' | awk '{print $1}')
+        c=$(echo "$fconfig" | grep -w "c =" | tail -n 1 | awk 'BEGIN {FS=" c ="} {print $2}' | awk '{print $1}')
+        alpha=$(echo "$fconfig" | grep -w "alpha =" | tail -n 1 | awk 'BEGIN {FS=" alpha ="} {print $2}' | awk '{print $1}')
+        beta=$(echo "$fconfig" | grep -w "beta  =" | tail -n 1 | awk 'BEGIN {FS=" beta  ="} {print $2}' | awk '{print $1}')
+        gamma=$(echo "$fconfig" | grep -w "gamma =" | tail -n 1 | awk 'BEGIN {FS=" gamma ="} {print $2}' | awk '{print $1}')
+        volume=$(echo "$fconfig" | grep -w "volume =" | tail -n 1 | awk 'BEGIN {FS="[=]"} {print $2}' | awk '{print $1}')
+        density=$(echo "$fconfig" | grep "g/cm^3" | tail -n 1 | awk 'BEGIN {FS="="} {print $2}' | awk '{print $1}')
+
+        # parse Enthalpy
+
+        enthalpy=''
+        enthalpy=$(echo "$fconfig" | grep -E -e "Final Enthalpy|corrected final free|Final free energy|Final energy" \
+                   | tail -n 1 | awk 'BEGIN {FS="="} {print $2}' | awk '{printf "%.8f", $1}')
+
+        # parse if snap_to_symmetry
+
+        snap_to_symmetry=''
+
+        if [[ $(echo "$fconfig" | grep "Symmetrised Forces" | wc -l) -ge 1 ]]; then
+            snap_to_symmetry='true'
+        else
+            snap_to_symmetry='false'
+        fi
+
+        # parse Pressure
+
+        pressure=''
+        pressure=$(echo "$fconfig" | grep "Pressure:" | tail -n 1 | awk 'BEGIN {FS="[*]|[:]"} {print $3}' | awk '{print $1}')
+        [[ -z $pressure ]] && pressure='NaN'
+
+
+        # parse Mulliken Spin (total)
+
+        spinmom=''
+        spinmom=$(echo "$fconfig" | sed -n '/Total   Charge(e)   Spin(hbar\/2)/,/Spin       Length (A)/p' \
+                  | sed '/==/,/==/!d;//d' | grep -v "dn" | tail -n $nions | awk '{sum += $10} END {print sum}')
+
+        #spin=''
+        #modspin=''
+        #spin=$(grep " Spin Den" $seedsplit.castep 2> /dev/null | tail -1 | awk '{print $5}')
+        #modspin=$(grep " |Spin Den" $seedsplit.castep 2> /dev/null | tail -1 | awk '{print $5}')
+
+
+        ## parse Mulliken Spin (atom)
+
+        echo "$fconfig" | sed -n '/Total   Charge(e)   Spin(hbar\/2)/,/Spin       Length (A)/p' \
+         | sed '/==/,/==/!d;//d' | grep -v "dn" | tail -n $nions | awk '{print $1, $10}' > mullikenspin.dat
+
+        #cat mullikenspin.dat | awk '{printf "%s=%.2f\n", $1, $2}' | sort -k 1 -u
+
+        ion_spin=$(cat mullikenspin.dat | awk '{printf "%s=%.2f\n", $1, $2}' | sort -k 1 -u | awk '{printf "%s, ",$1}')
+
+
+        # save as tsv
+
+        if [[ $header == 'true' ]]; then        
+            (
+                printf "%s\t" "status"
+                printf "%s\t" "niter"
+
+                printf "%s\t" "a(Å)"
+                printf "%s\t" "b(Å)"
+                printf "%s\t" "c(Å)"
+                printf "%s\t" "α(°)"
+                printf "%s\t" "β(°)"
+                printf "%s\t" "γ(°)"
+                printf "%s\t" "volume(Å**3)"
+                printf "%s\t" "density(g/cc)"
+
+                printf "%s\t" "enthalpy(eV)"
+                printf "%s\t" "snap_to_symmetry"
+                printf "%s\t" "pressure(GPa)"
+                printf "%s\t" "spin(hbar/2/cell)"
+                printf "%s"   "spin(hbar/2/ion)"
+                printf "\n"
+            ) > output.tsv
+        fi
+            (
+                printf "%s\t" "$stat"
+                printf "%s\t" "$niter"
+
+                printf "%s\t" "$a"
+                printf "%s\t" "$b"
+                printf "%s\t" "$c"
+                printf "%s\t" "$alpha"
+                printf "%s\t" "$beta"
+                printf "%s\t" "$gamma"
+                printf "%s\t" "$volume"
+                printf "%s\t" "$density"
+
+                printf "%s\t" "$enthalpy"
+                printf "%s\t" "$snap_to_symmetry"
+                printf "%s\t" "$pressure"
+                printf "%s\t" "$spinmom"
+                printf "%s"   "$ion_spin"
+                printf "\n"                  
+            ) >> output.tsv
+
+        [[ $opt_verbose == 'true' ]] && catcsv output.tsv && echo
+
+        header='false'
+
+        castep2res $seedsplit > $seedsplit-out.res
+    done
+
+    ## generate res file ...
+
+    castep2res $seed > $seed-out.res
+
+    echo && catcsv input-param.tsv && echo
+    echo && catcsv input-cell.tsv && echo
+    echo && catcsv output.tsv && echo 
+
+    echo "for copying to sheet..."
+
+    echo && cat input-param.tsv && echo
+    echo && cat input-cell.tsv && echo
+    echo && cat output.tsv && echo 
+}
+
+
 
 # Monitor convergence
 
@@ -308,232 +630,6 @@ function conv {
 
 }
 
-# Parsing output values
-
-function output {
-   
-    ## parsing seed.castep
-
-    echo -e $color 
-    echo -e "collect information from final configuration ..."
-    echo -e $endcolor
-
-    ## information from input of final castep run
-
-    input=$(sed -n -r '/^ \*+ Title \*+/,/^\+\-+ MEMORY/p' $seed.castep)
-
-    [[ -z $input ]] && (echo "Input parameters not found ..."; exit 1)
-
-    task=$(echo "$input" | grep "type of calculation" | tail -n 1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
-    nions=$(echo "$input" | grep "Total number of ions in cell =" | tail -n 1 | awk '{print $8}')
-    spacegroup=$(echo "$input" | grep "Space group of crystal =" | tail -n 1 | awk 'BEGIN {FS="[:]|[,]"} {print $2}' \
-                 | awk '{print $1}')
-
-    echo "task       = $task"
-    echo "nions      = $nions"
-    echo "spacegroup = $spacegroup"
-
-    if [[ $task == 'single point energy' ]]; then
-
-        status='NULL'
-        echo "status     = $status"
-
-        ## final configuration (of last CASTEP run) - pressure, enthalypy
-
-        pressure=$(grep "Pressure:" $seed.castep | awk 'BEGIN {FS="[*]|[:]"} {print $3}' | awk '{print $1}')
-        [[ -z $pressure ]] && pressure='NULL'
-        enthalpy=$(grep -E -e "Final Enthalpy|corrected final free|Final free energy|Final energy" $seed.castep\
-                   | tail -n 1 | awk 'BEGIN {FS="="} {print $2}' | awk '{printf "%.8f", $1}')
-        snap_to_symmetry=$(grep "Symmetrised Forces" $seed.castep | wc -l)
-        if [[ $snap_to_symmetry -ge 1 ]]; then
-            snap_to_symmetry='true'
-        else
-            snap_to_symmetry='false'
-        fi
-
-        echo "pressure   = $pressure GPa"
-        echo "enthalpy   = $enthalpy eV"
-        echo "snap_to_symmetry = $snap_to_symmetry"
-
-        a=$(echo "$input" | grep -w "a =" | tail -n 1 | awk 'BEGIN {FS=" a ="} {print $2}' | awk '{print $1}')
-        b=$(echo "$input" | grep -w "b =" | tail -n 1 | awk 'BEGIN {FS=" b ="} {print $2}' | awk '{print $1}')
-        c=$(echo "$input" | grep -w "c =" | tail -n 1 | awk 'BEGIN {FS=" c ="} {print $2}' | awk '{print $1}')
-        alpha=$(echo "$input" | grep -w "alpha =" | tail -n 1 | awk 'BEGIN {FS=" alpha ="} {print $2}' | awk '{print $1}')
-        beta=$(echo "$input" | grep -w "beta  =" | tail -n 1 | awk 'BEGIN {FS=" beta  ="} {print $2}' | awk '{print $1}')
-        gamma=$(echo "$input" | grep -w "gamma =" | tail -n 1 | awk 'BEGIN {FS=" gamma ="} {print $2}' | awk '{print $1}')
-        volume=$(echo "$input" | grep -w "volume =" | tail -n 1 | awk 'BEGIN {FS="[=]"} {print $2}' | awk '{print $1}')
-        density=$(echo "$input" | grep "g/cm^3" | tail -n 1 | awk 'BEGIN {FS="="} {print $2}' | awk '{print $1}')
-
-        spinmom=$(sed -n '/Total   Charge(e)   Spin(hbar\/2)/,/Spin       Length (A)/p' $seed.castep \
-                  | sed '/==/,/==/!d;//d' | grep -v "dn" | tail -n $nions | awk '{sum += $10} END {print sum}')
-
-        echo "a          = $a A"
-        echo "b          = $b A"
-        echo "c          = $c A"
-        echo "alpha      = $alpha deg"
-        echo "beta       = $beta deg"
-        echo "gamma      = $gamma deg"
-        echo "volume     = $volume A**3"
-        echo "density    = $density g/cm^3"
-        echo "spinmom    = $spinmom hbar/2"
-
-        # final SCF loop
-    
-        spin=$(grep " Spin Den" $seed.castep 2> /dev/null | awk '{print $5}')
-        modspin=$(grep " |Spin Den" $seed.castep 2> /dev/null | awk '{print $5}')
-    
-        echo "spin       = $spin hbar/2"
-        echo "modspin    = $modspin hbar/2"
-
-        echo -e $color
-        echo -e "list of atomic spin"
-        echo -e $endcolor
-    
-        sed -n '/Total   Charge(e)   Spin(hbar\/2)/,/Spin       Length (A)/p' $seed.castep \
-         | sed '/==/,/==/!d;//d' | grep -v "dn" | tail -n $nions | awk '{print $1, $10}' > mullikenspin.dat
-        cat mullikenspin.dat | awk '{printf "%s=%.2f\n", $1, $2}' | sort -k 1 -u
-        castep2res $seed > $seed-out.res
-    else
-    
-        ## check if geometry optimization is done successfully
-    
-        converged=$(sed -n '/Geometry optimization/p' $seed.castep)
-        nrun=$(sed -n '/Geometry optimization/p' $seed.castep | wc -l)
-        nfailed=$(sed -n '/Geometry optimization/p' $seed.castep | sed -n '/failed/p' | wc -l)
-        ncompleted=$(sed -n '/Geometry optimization/p' $seed.castep | sed -n '/completed/p' | wc -l)
-        status='rerun'
-        [[ $nfailed -eq 0 ]] && [[ $ncompleted -eq 3 ]] && status='done'
-    
-        echo "$converged"
-        echo "nrun       = $nrun"
-        echo "nfailed    = $nfailed"
-        echo "ncompleted = $ncompleted"
-        echo "status     = $status"
-    
-        ## final configuration
-    
-        fconfig=$(sed -n '/LBFGS: Final Configuration/,/Total time          =/p' $seed.castep)
-    
-        [[ -z $fconfig ]] && (echo "Final Configuration not found ..."; exit 1)
-    
-        ## final configuration (of last CASTEP run) - pressure, enthalypy
-    
-        pressure=$(echo "$fconfig" | grep "Pressure:" | tail -n 1 | awk 'BEGIN {FS="[*]|[:]"} {print $3}' | awk '{print $1}')
-        enthalpy=$(echo "$fconfig" | grep -E -e "Final Enthalpy|corrected final free|Final free energy|Final energy" \
-                   | tail -n 1 | awk 'BEGIN {FS="="} {print $2}' | awk '{printf "%.8f", $1}')
-        snap_to_symmetry=$(echo "$fconfig" | grep "Symmetrised Forces" | wc -l)
-        if [[ $snap_to_symmetry -ge 1 ]]; then
-            snap_to_symmetry='true'
-        else
-            snap_to_symmetry='false'
-        fi
-    
-        echo "pressure   = $pressure GPa"
-        echo "enthalpy   = $enthalpy eV"
-        echo "snap_to_symmetry = $snap_to_symmetry"
-    
-        ## final configuration (of last CASTEP run) - Unit Cell
-    
-        a=$(echo "$fconfig" | grep -w "a =" | tail -n 1 | awk 'BEGIN {FS=" a ="} {print $2}' | awk '{print $1}')
-        b=$(echo "$fconfig" | grep -w "b =" | tail -n 1 | awk 'BEGIN {FS=" b ="} {print $2}' | awk '{print $1}')
-        c=$(echo "$fconfig" | grep -w "c =" | tail -n 1 | awk 'BEGIN {FS=" c ="} {print $2}' | awk '{print $1}')
-        alpha=$(echo "$fconfig" | grep -w "alpha =" | tail -n 1 | awk 'BEGIN {FS=" alpha ="} {print $2}' | awk '{print $1}')
-        beta=$(echo "$fconfig" | grep -w "beta  =" | tail -n 1 | awk 'BEGIN {FS=" beta  ="} {print $2}' | awk '{print $1}')
-        gamma=$(echo "$fconfig" | grep -w "gamma =" | tail -n 1 | awk 'BEGIN {FS=" gamma ="} {print $2}' | awk '{print $1}')
-        volume=$(echo "$fconfig" | grep -w "volume =" | tail -n 1 | awk 'BEGIN {FS="[=]"} {print $2}' | awk '{print $1}')
-        density=$(echo "$fconfig" | grep "g/cm^3" | tail -n 1 | awk 'BEGIN {FS="="} {print $2}' | awk '{print $1}')
-    
-        # in case of the geometry optimization without variable cell
-        if [[ -z $a ]]; then
-            a=$(echo "$input" | grep -w "a =" | tail -n 1 | awk 'BEGIN {FS=" a ="} {print $2}' | awk '{print $1}')
-            b=$(echo "$input" | grep -w "b =" | tail -n 1 | awk 'BEGIN {FS=" b ="} {print $2}' | awk '{print $1}')
-            c=$(echo "$input" | grep -w "c =" | tail -n 1 | awk 'BEGIN {FS=" c ="} {print $2}' | awk '{print $1}')
-            alpha=$(echo "$input" | grep -w "alpha =" | tail -n 1 | awk 'BEGIN {FS=" alpha ="} {print $2}' | awk '{print $1}')
-            beta=$(echo "$input" | grep -w "beta  =" | tail -n 1 | awk 'BEGIN {FS=" beta  ="} {print $2}' | awk '{print $1}')
-            gamma=$(echo "$input" | grep -w "gamma =" | tail -n 1 | awk 'BEGIN {FS=" gamma ="} {print $2}' | awk '{print $1}')
-            volume=$(echo "$input" | grep -w "volume =" | tail -n 1 | awk 'BEGIN {FS="[=]"} {print $2}' | awk '{print $1}')
-            density=$(echo "$input" | grep "g/cm^3" | tail -n 1 | awk 'BEGIN {FS="="} {print $2}' | awk '{print $1}')
-        fi
-    
-        spinmom=$(echo "$fconfig" | sed -n '/Total   Charge(e)   Spin(hbar\/2)/,/Spin       Length (A)/p' \
-                  | sed '/==/,/==/!d;//d' | grep -v "dn" | tail -n $nions | awk '{sum += $10} END {print sum}')
-    
-        echo "a          = $a A"
-        echo "b          = $b A"
-        echo "c          = $c A"
-        echo "alpha      = $alpha deg"
-        echo "beta       = $beta deg"
-        echo "gamma      = $gamma deg"
-        echo "volume     = $volume A**3"
-        echo "density    = $density g/cm^3"
-        echo "spinmom    = $spinmom hbar/2"
-    
-        # final SCF loop
-    
-        spin=$(grep " Spin Den" $seed.castep 2> /dev/null | tail -1 | awk '{print $5}')
-        modspin=$(grep " |Spin Den" $seed.castep 2> /dev/null | tail -1 | awk '{print $5}')
-    
-        echo "spin       = $spin hbar/2"
-        echo "modspin    = $modspin hbar/2"
-
-        echo -e $color
-        echo -e "list of atomic spin"
-        echo -e $endcolor
-    
-        echo "$fconfig" | sed -n '/Total   Charge(e)   Spin(hbar\/2)/,/Spin       Length (A)/p' \
-         | sed '/==/,/==/!d;//d' | grep -v "dn" | tail -n $nions | awk '{print $1, $10}' > mullikenspin.dat
-        cat mullikenspin.dat | awk '{printf "%s=%.2f\n", $1, $2}' | sort -k 1 -u
-        
-        #echo "generate cif file ..."
-        #cabal cell cif 0.0 < $seed.cell > $seed.cif
-        castep2res $seed > $seed-out.res
-    fi
-
-    ion_spin=$(cat mullikenspin.dat | awk '{printf "%s=%.2f\n", $1, $2}' | sort -k 1 -u | awk '{printf "%s, ",$1}')
-
-    echo -e $color
-    echo -e "summary - output ..."
-    echo -e $endcolor
-
-    (
-        printf "%s\t" "status"
-        printf "%s\t" "nions"
-        printf "%s\t" "spacegroup"
-        printf "%s\t" "a(Å)"
-        printf "%s\t" "b(Å)"
-        printf "%s\t" "c(Å)"
-        printf "%s\t" "α(°)"
-        printf "%s\t" "β(°)"
-        printf "%s\t" "γ(°)"
-        printf "%s\t" "volume(Å**3)"
-        printf "%s\t" "density(g/cc)"
-        printf "%s\t" "enthalpy(eV)"
-        printf "%s\t" "snap_to_symmetry"
-        printf "%s\t" "spin(hbar/2/cell)"
-        printf "%s\t" "spin(hbar/2/ion)"
-        printf "\n"
-        printf "%s\t" "$status"
-        printf "%s\t" "$nions"
-        printf "%s\t" "$spacegroup"
-        printf "%s\t" "$a"
-        printf "%s\t" "$b"
-        printf "%s\t" "$c"
-        printf "%s\t" "$alpha"
-        printf "%s\t" "$beta"
-        printf "%s\t" "$gamma"
-        printf "%s\t" "$volume"
-        printf "%s\t" "$density"
-        printf "%s\t" "$enthalpy"
-        printf "%s\t" "$snap_to_symmetry"
-        printf "%s\t" "$spinmom"
-        printf "%s\t" "$ion_spin"
-        printf "\n"                  
-    ) > output.dat
-    cat output.dat
-
-}
-
-
 function dryrun {
     if [[ ! -d ./dryrun ]]; then
         mkdir ./dryrun
@@ -569,7 +665,9 @@ function dryrun {
     echo
 }
 
-[[ $opt_input == 'true' ]] && input
+casplit
+parsing
+
 [[ $opt_conv == 'true' ]] && conv
-[[ $opt_output == 'true' ]] && output
+
 exit 0
