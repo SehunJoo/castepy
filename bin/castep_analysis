@@ -280,7 +280,7 @@ function parsing {
                 printf "%s\t" "geom_disp_tol"
                 printf "%s"   "geom_stress_tol"
                 printf "\n"
-            ) > input-param.tsv
+            ) > data-input-param.tsv
 
         fi
             (
@@ -311,7 +311,7 @@ function parsing {
                 printf "%s\t" "$geom_disp_tol"
                 printf "%s"   "$geom_stress_tol"
                 printf "\n"
-            ) >> input-param.tsv
+            ) >> data-input-param.tsv
 
         if [[ $header == 'true' ]]; then        
             (
@@ -332,7 +332,7 @@ function parsing {
                 printf "%s\t" "spacegroup"
                 printf "%s"   "cell_constraints"
                 printf "\n"
-            ) > input-cell.tsv
+            ) > data-input-cell.tsv
 
         fi
             (
@@ -353,10 +353,10 @@ function parsing {
                 printf "%s\t" "$spacegroup"
                 printf "%s"   "$cell_constraints"
                 printf "\n"
-            ) >> input-cell.tsv
+            ) >> data-input-cell.tsv
 
-        [[ $opt_verbose == 'true' ]] && catcsv input-param.tsv && echo
-        [[ $opt_verbose == 'true' ]] && catcsv input-cell.tsv && echo
+        [[ $opt_verbose == 'true' ]] && catcsv data-input-param.tsv && echo
+        [[ $opt_verbose == 'true' ]] && catcsv data-input-cell.tsv && echo
 
         # =========================================================================================
 
@@ -392,7 +392,7 @@ function parsing {
             fconfig=$(sed -n '/LBFGS: Final Configuration/,/Total time          =/p' $seedsplit.castep)
         fi
         
-        [[ -z $fconfig ]] && (echo "Final Configuration not found ..."; exit 1)
+        [[ -z $fconfig ]] && echo "Final Configuration not found ..." && continue
             
         ## parse Unit Cell
 
@@ -481,7 +481,7 @@ function parsing {
                 printf "%s\t" "spin(hbar/2/cell)"
                 printf "%s"   "spin(hbar/2/ion)"
                 printf "\n"
-            ) > output.tsv
+            ) > data-output.tsv
         fi
             (
                 printf "%s\t" "$stat"
@@ -502,9 +502,9 @@ function parsing {
                 printf "%s\t" "$spinmom"
                 printf "%s"   "$ion_spin"
                 printf "\n"                  
-            ) >> output.tsv
+            ) >> data-output.tsv
 
-        [[ $opt_verbose == 'true' ]] && catcsv output.tsv && echo
+        [[ $opt_verbose == 'true' ]] && catcsv data-output.tsv && echo
 
         header='false'
 
@@ -515,15 +515,15 @@ function parsing {
 
     castep2res $seed > $seed-out.res
 
-    echo && catcsv input-param.tsv && echo
-    echo && catcsv input-cell.tsv && echo
-    echo && catcsv output.tsv && echo 
+    echo && catcsv data-input-param.tsv && echo
+    echo && catcsv data-input-cell.tsv && echo
+    echo && catcsv data-output.tsv && echo 
 
     echo "for copying to sheet..."
 
-    echo && cat input-param.tsv && echo
-    echo && cat input-cell.tsv && echo
-    echo && cat output.tsv && echo 
+    echo && cat data-input-param.tsv && echo
+    echo && cat data-input-cell.tsv && echo
+    echo && cat data-output.tsv && echo 
 }
 
 

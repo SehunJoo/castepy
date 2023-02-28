@@ -46,8 +46,14 @@ do
         sed -i 's/^write_cst_esp [[:print:]]*/write_cst_esp             : false/' $seed.param
         sed -i 's/^write_bands [[:print:]]*/write_bands               : false/' $seed.param
 
+
+        # both options cannot speciifed together
+        # Error in parameters file: duplication with keywords BACKUP_INTERVAL and NUM_BACKUP_ITER
         sed -i '/backup_interval [[:print:]]*/d' $seed.param
-        echo "backup_interval           : 82800" >> $seed.param
+        sed -i '/num_backup_iter [[:print:]]*/d' $seed.param
+        echo "backup_interval           : 300" >> $seed.param
+        #echo "num_backup_iter           : 5" >> $seed.param
+
         sed -i '/continuation [[:print:]]*/d' $seed.param
         echo "continuation              : default" >> $seed.param
     else

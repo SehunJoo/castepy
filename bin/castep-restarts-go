@@ -1,0 +1,72 @@
+#!/bin/bash
+
+set -e
+
+if [ $# -ne 1 ]; then
+    echo 1>&2 "Usage: $(basename $0)  <seed>"
+    exit 127
+fi
+
+seed=$1
+dir=${PWD##*/}
+newdir=$(echo $dir | awk 'BEGIN{FS="opt"}{n = $2 + 1; printf "%sopt%d", $1, n}')
+
+
+echo "current directory: $dir"
+echo "new directory: $newdir"
+echo
+
+
+
+
+# make new directory
+
+mkdir ../$newdir;
+ls -l --color ../
+echo
+
+# Trap a crashing of the code (by wall clock limit)
+
+crashed=`tail -20 $seed.castep | grep "Total time          = " | awk '{print $1}'`
+
+if [[ $crashed != Total ]]
+then
+    if [[ -f $seed.check_bak ]]
+    then
+        echo "restart using $seed.check_bak ..."
+
+        cp jobscript* ../$newdir
+        cp $seed{.cell,.param} ../$newdir
+        cp $seed.check_bak ../$newdir/$seed.check
+
+    elif [[ -f $seed.check ]]
+    then 
+        echo "restart using $seed.check ..."
+
+        cp jobscript* ../$newdir
+        cp $seed{.cell,.param} ../$newdir
+        cp $seed.check ../$newdir/$seed.check
+    else
+        echo "restart from input structure of final run ..."
+
+        cp jobscript* ../$newdir
+        cp $seed{.cell,.param} ../$newdir
+        param-task geoemetryoptimization
+    fi
+else
+    cp $seed{.cell,.param,.castep,-out.cell} jobscript* ../$newdir
+    cd ../$newdir
+    new_cell $seed
+    rm -rf $seed{.castep,-out.cell}
+    
+
+# copy input files
+
+
+
+
+ls -l --color
+
+pwd
+
+exit 0
