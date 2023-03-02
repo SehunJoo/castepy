@@ -5,7 +5,13 @@ set -e
 for seed in $(ls *.cell | awk 'BEGIN {FS=".cell"} {print $1}')
 do
     echo "$seed.cell"
+
+    # delete white spaces
+
     sed -i -e 's/^ *//g' -e 's/ *$//g' $seed.cell
+
+    # delete multiple blank lines
+
     cat $seed.cell | uniq > $seed.cell.temp
     mv $seed.cell.temp $seed.cell
 done

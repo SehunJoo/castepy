@@ -39,7 +39,6 @@ fi
 
 rm -f $seed.param.temp
 
-dos2unix $seed.param 1> /dev/null 2>&1
 
 # backup
 
@@ -89,7 +88,11 @@ echo -e "after cleaning"
 echo -e $endcolor
 
 mv $seed.param.temp $seed.param
-cat $seed.param
+
+# convert dos2unix
+sed -i 's/\r$//g' $seed.param
+
+#cat $seed.param
 
 # for debugging
 #cat $seed.param.temp

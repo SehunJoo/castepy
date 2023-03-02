@@ -26,6 +26,16 @@ seed=$2 # seed.param
 
 rm -f $seed.param.cmp
 
+if [[ $(which castep 2>/dev/null | wc -l) -ne 0 ]]
+then
+    executable='castep'
+elif [[ $(which castep.mpi 2>/dev/null | wc -l) -ne 0 ]]
+then
+    executable='castep.mpi'
+else
+    echo "castep not found" && exit 1
+fi
+
 param-clean $ref 1> /dev/null
 param-clean $seed 1> /dev/null
 
@@ -46,7 +56,7 @@ do
     if [[ `sed -n "/^$key_ref /p" $seed.param | wc -l` -eq 1 ]]; then
 
         # Get the value associated with the keyword
-        val_type=`castep -h $key_ref | grep 'Type:' | awk '{print $2}'`
+        val_type=`$executable -h $key_ref | grep 'Type:' | awk '{print $2}'`
         val=`cat $seed.param | sed -n "/^$key_ref /p" | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}'`;
 
         # Check if the values are the same
@@ -87,6 +97,6 @@ do
         
 done
 
-cat $seed.param.cmp
+#cat $seed.param.cmp
 
 exit 0

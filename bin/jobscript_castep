@@ -46,31 +46,15 @@ echo "start_time:         ${t_start}"                   >> ${prefix}.${jids}
 
 seed=$(ls *.param)
 seed=${seed%.param}
-
-# spe
-
-# geomopt
-
-for i in {1..4}
+for i in {1..3}
 do
-    if [[ $i -eq 1 ]]
-    then
-        echo
-        #sed -i 's/^task [[:print:]]*/task                      : singlepoint/' $seed.param
-        #sed -i 's/^metals_method [[:print:]]*/metals_method             : edft/' $seed.param
-    else
-        sed -i 's/^task [[:print:]]*/task                      : geometryoptimization/' $seed.param
-        sed -i 's/^metals_method [[:print:]]*/metals_method             : dm/' $seed.param
-    fi
-
     seedrun=$(echo $seed $i | awk '{printf "%s-run-%02d", $1, $2}')
     srun --distribution=block:block --hint=nomultithread castep.mpi $seed
     cp $seed.cell     $seedrun.cell
     cp $seed-out.cell $seedrun-out.cell
-    [[ $(ls $seed.*.err 2>/dev/null | wc -l) -gt 0 ]] && cat $seed.*.err  > $seedrun.err && rm -rf $seed.*.err
 
     stat=$(tail -20 $seed.castep | grep "Total time          = " | awk '{print $1}')
-    [[ $stat == Total ]] && new_cell $seed
+    [[ $stat != Total ]] && new_cell $seed
 done
 
 

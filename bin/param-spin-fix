@@ -1,0 +1,52 @@
+#!/bin/bash
+
+set -e
+
+color='\033[1\0;31m'
+endcolor='\033[0m'
+
+function usage {
+    echo 1>&2 -e $color
+    echo 1>&2 -e "usage: $(basename $0) [option]"
+    echo 1>&2 -e $endcolor
+    echo 1>&2 "$(basename $0)  default"
+    echo 1>&2 "$(basename $0)  fix"
+    echo 1>&2
+    exit 1
+}
+
+if [ $# -lt 1 ]; then
+    usage
+fi
+
+opt=$1
+
+for seed in $(ls *.param | awk 'BEGIN {FS=".param"} {print $1}')
+do
+    echo "$seed.param"
+
+    # Only relevant for a FIX_OCCUPANCY=FALSE calculation.
+
+    if [[ $opt == 'default' ]]
+    then
+        # The total spin is held constant for SPIN_FIX SCF cycles
+        # (or less if electronic convergence criteria met with the fixed spin) and then allowed to relax.
+        sed -i 's/^spin_fix [[:print:]]*/spin_fix                  : 10/' $seed.param
+
+        # The total spin is allowed to vary after GEOM_SPIN_FIX steps of the geometry optimization algorithm
+        sed -i 's/^geom_spin_fix [[:print:]]*/geom_spin_fix             : 0/' $seed.param
+
+    elif [[ $opt == 'fix' ]]
+    then
+        # If SPIN_FIX<0 then the total spin is held constant for all SCF cycles.
+        sed -i 's/^spin_fix [[:print:]]*/spin_fix                  : -1/' $seed.param
+
+        # If GEOM_SPIN_FIX<0the total spin is held constant at the value found at the end of the first configuration.
+        sed -i 's/^geom_spin_fix [[:print:]]*/geom_spin_fix             : -1/' $seed.param
+    else
+        "$opt is not available" && exit 1
+    fi
+
+done
+
+exit 0

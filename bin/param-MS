@@ -3,7 +3,7 @@
 set -e
 
 
-if [[ $# -ne 1 ]]; then
+if [[ $# -ne 2 ]]; then
     echo "usage: $(basename $0) <seed> <keep>"
     echo "keep  : 0: remove 1:keep"
     exit 1
@@ -15,25 +15,36 @@ keep=$2
 echo "Convert .param generated from MS to my style"
 
 
-echo
-echo "Generarate seed-gencell.param"
-echo
+## checks before proceeding
+
+[[ ! -f $seed.param ]] && echo "$seed.param not found" && exit 1
+
+# backup
+
+md5=`md5sum $seed.param | cut -c 1-8`
+cp $seed.param $seed.param.$md5
+
+
+# generated seed-gencell.param
+
+echo -e "\nGenerarate $seed-gencell.param\n"
 param-gen-gencell $seed
 
-echo
-echo "Generarate seed-default.param"
-echo
+# generated seed-default.param
+
+echo -e "\nGenerarate $seed-default.param\n"
 param-gen-default $seed
 
+# compare parameters
+
+echo -e "\ncompare param\n"
 param-comparison $seed-gencell $seed
 mv $seed.param.cmp $seed.param
 
+echo -e "\ncompare param\n"
 param-comparison $seed-default $seed
 mv $seed.param.cmp $seed.param
 
 sed -i 's/nextra_bands/#nextra_bands/' $seed.param
-
-echo "## added" >> $seed.param
-echo "write_cif_structure       : true" >> $seed.param
 
 [[ $keep == "1" ]] && rm -rf *$seed-gencell.param* *$seed-default.param*

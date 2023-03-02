@@ -10,7 +10,10 @@ function usage {
     echo 1>&2 -e "usage: $(basename $0) [quality]" 2>&1
     echo 1>&2 -e $endcolor
     echo 1>&2 "$(basename $0)  express"
+    echo 1>&2 "$(basename $0)  coarse"
     echo 1>&2 "$(basename $0)  default"
+    echo 1>&2 "$(basename $0)  medium"
+    echo 1>&2 "$(basename $0)  fine"
     echo 1>&2 "$(basename $0)  ultrafine"
     echo 1>&2 
     exit 1
@@ -23,7 +26,7 @@ if [ $# -lt 1 ]; then
 fi
 
 case $1 in
-    express | default | ultrafine)
+    express | coarse | default | medium | fine | ultrafine)
         quality=$1
         ;;
     *)
@@ -38,31 +41,86 @@ for seed in $(ls *.param | awk 'BEGIN {FS=".param"} {print $1}')
 do
     echo "$seed.param"
 
+    [[ $(sed -n '/^elec_energy_tol /p' $seed.param | wc -l) -gt 1 ]] && echo "Error: check elec_energy_tol keyword" && exit 1
+    [[ $(sed -n '/^geom_energy_tol /p' $seed.param | wc -l) -gt 1 ]] && echo "Error: check elec_energy_tol keyword" && exit 1
+    [[ $(sed -n '/^geom_force_tol /p'  $seed.param | wc -l) -gt 1 ]] && echo "Error: check elec_energy_tol keyword" && exit 1
+    [[ $(sed -n '/^geom_stress_tol /p' $seed.param | wc -l) -gt 1 ]] && echo "Error: check elec_energy_tol keyword" && exit 1
+    [[ $(sed -n '/^geom_disp_tol /p'   $seed.param | wc -l) -gt 1 ]] && echo "Error: check elec_energy_tol keyword" && exit 1
+
+    [[ $(sed -n '/^elec_energy_tol /p'      $seed.param | wc -l) -lt 1 ]] && echo "elec_energy_tol : "      >> $seed.param
+    [[ $(sed -n '/^elec_eigenvalue_tol /p'  $seed.param | wc -l) -lt 1 ]] && echo "elec_eigenvalue_tol : "  >> $seed.param
+    [[ $(sed -n '/^elec_convergence_win /p' $seed.param | wc -l) -lt 1 ]] && echo "elec_convergence_win : " >> $seed.param
+    [[ $(sed -n '/^geom_energy_tol /p'      $seed.param | wc -l) -lt 1 ]] && echo "geom_energy_tol : "      >> $seed.param
+    [[ $(sed -n '/^geom_force_tol /p'       $seed.param | wc -l) -lt 1 ]] && echo "geom_force_tol : "       >> $seed.param
+    [[ $(sed -n '/^geom_stress_tol /p'      $seed.param | wc -l) -lt 1 ]] && echo "geom_stress_tol : "      >> $seed.param
+    [[ $(sed -n '/^geom_disp_tol /p'        $seed.param | wc -l) -lt 1 ]] && echo "geom_disp_tol : "        >> $seed.param
+
     sed -i 's/^#elec_energy_tol /elec_energy_tol /' $seed.param
     sed -i 's/^#geom_energy_tol /geom_energy_tol /' $seed.param
     sed -i 's/^#geom_force_tol /geom_force_tol /' $seed.param
     sed -i 's/^#geom_stress_tol /geom_stress_tol /' $seed.param
     sed -i 's/^#geom_disp_tol /geom_disp_tol /' $seed.param
 
-    if [[ $quality == "express" ]]
+    if [[ $quality == "express" ]] # MS express quality
     then
         sed -i 's/^elec_energy_tol [[:print:]]*/elec_energy_tol           : 1.0e-04/' $seed.param
-        sed -i 's/^geom_energy_tol [[:print:]]*/geom_energy_tol           : 1.0e-03/' $seed.param
-        sed -i 's/^geom_force_tol [[:print:]]*/geom_force_tol            : 100/' $seed.param
-        sed -i 's/^geom_stress_tol [[:print:]]*/geom_stress_tol           : 100/' $seed.param
-        sed -i 's/^geom_disp_tol [[:print:]]*/geom_disp_tol             : 100/' $seed.param
+        sed -i 's/^elec_eigenvalue_tol [[:print:]]*/elec_eigenvalue_tol       : 1.0e-04/' $seed.param
+        sed -i 's/^elec_convergence_win [[:print:]]*/elec_convergence_win      : 2/' $seed.param
+        sed -i 's/^geom_energy_tol [[:print:]]*/geom_energy_tol           : 5.0e-04/' $seed.param
+        sed -i 's/^geom_force_tol [[:print:]]*/geom_force_tol            : 0.5/' $seed.param
+        sed -i 's/^geom_stress_tol [[:print:]]*/geom_stress_tol           : 1.0/' $seed.param
+        sed -i 's/^geom_disp_tol [[:print:]]*/geom_disp_tol             : 0.03/' $seed.param
+        #sed -i 's/^elec_energy_tol [[:print:]]*/elec_energy_tol           : 1.0e-04/' $seed.param
+        #sed -i 's/^geom_energy_tol [[:print:]]*/geom_energy_tol           : 1.0e-03/' $seed.param
+        #sed -i 's/^geom_force_tol [[:print:]]*/geom_force_tol            : 100/' $seed.param
+        #sed -i 's/^geom_stress_tol [[:print:]]*/geom_stress_tol           : 100/' $seed.param
+        #sed -i 's/^geom_disp_tol [[:print:]]*/geom_disp_tol             : 100/' $seed.param
 
-    elif [[ $quality == "default" ]]
+    elif [[ $quality == "coarse" ]] # MS coarse quality
     then
         sed -i 's/^elec_energy_tol [[:print:]]*/elec_energy_tol           : 1.0e-05/' $seed.param
+        sed -i '/^elec_eigenvalue_tol [[:print:]]*/d' $seed.param
+        sed -i '/^elec_convergence_win [[:print:]]*/d' $seed.param
+        sed -i 's/^geom_energy_tol [[:print:]]*/geom_energy_tol           : 5.0e-05/' $seed.param
+        sed -i 's/^geom_force_tol [[:print:]]*/geom_force_tol            : 0.1/' $seed.param
+        sed -i 's/^geom_stress_tol [[:print:]]*/geom_stress_tol           : 0.2/' $seed.param
+        sed -i 's/^geom_disp_tol [[:print:]]*/geom_disp_tol             : 0.005/' $seed.param
+
+    elif [[ $quality == "default" ]] # CASTEP default
+    then
+        sed -i 's/^elec_energy_tol [[:print:]]*/elec_energy_tol           : 1.0e-05/' $seed.param
+        sed -i '/^elec_eigenvalue_tol [[:print:]]*/d' $seed.param
+        sed -i '/^elec_convergence_win [[:print:]]*/d' $seed.param
         sed -i 's/^geom_energy_tol [[:print:]]*/geom_energy_tol           : 2.0e-05/' $seed.param
         sed -i 's/^geom_force_tol [[:print:]]*/geom_force_tol            : 0.05/' $seed.param
         sed -i 's/^geom_stress_tol [[:print:]]*/geom_stress_tol           : 0.1/' $seed.param
         sed -i 's/^geom_disp_tol [[:print:]]*/geom_disp_tol             : 0.001/' $seed.param
 
-    elif [[ $quality == "ultrafine" ]]
+    elif [[ $quality == "medium" ]] # MS medium quality
+    then
+        sed -i 's/^elec_energy_tol [[:print:]]*/elec_energy_tol           : 2.0e-06/' $seed.param
+        sed -i '/^elec_eigenvalue_tol [[:print:]]*/d' $seed.param
+        sed -i '/^elec_convergence_win [[:print:]]*/d' $seed.param
+        sed -i 's/^geom_energy_tol [[:print:]]*/geom_energy_tol           : 2.0e-05/' $seed.param
+        sed -i 's/^geom_force_tol [[:print:]]*/geom_force_tol            : 0.05/' $seed.param
+        sed -i 's/^geom_stress_tol [[:print:]]*/geom_stress_tol           : 0.1/' $seed.param
+        sed -i 's/^geom_disp_tol [[:print:]]*/geom_disp_tol             : 0.002/' $seed.param
+
+    elif [[ $quality == "fine" ]] # MS fine quality
+    then
+        sed -i 's/^elec_energy_tol [[:print:]]*/elec_energy_tol           : 1.0e-06/' $seed.param
+        sed -i '/^elec_eigenvalue_tol [[:print:]]*/d' $seed.param
+        sed -i '/^elec_convergence_win [[:print:]]*/d' $seed.param
+        sed -i 's/^geom_energy_tol [[:print:]]*/geom_energy_tol           : 1.0e-05/' $seed.param
+        sed -i 's/^geom_force_tol [[:print:]]*/geom_force_tol            : 0.03/' $seed.param
+        sed -i 's/^geom_stress_tol [[:print:]]*/geom_stress_tol           : 0.05/' $seed.param
+        sed -i 's/^geom_disp_tol [[:print:]]*/geom_disp_tol             : 0.001/' $seed.param
+
+    elif [[ $quality == "ultrafine" ]] # MS ultrafine quality
     then
         sed -i 's/^elec_energy_tol [[:print:]]*/elec_energy_tol           : 5.0e-07/' $seed.param
+        sed -i '/^elec_eigenvalue_tol [[:print:]]*/d' $seed.param
+        sed -i '/^elec_convergence_win [[:print:]]*/d' $seed.param
         sed -i 's/^geom_energy_tol [[:print:]]*/geom_energy_tol           : 5.0e-06/' $seed.param
         sed -i 's/^geom_force_tol [[:print:]]*/geom_force_tol            : 0.01/' $seed.param
         sed -i 's/^geom_stress_tol [[:print:]]*/geom_stress_tol           : 0.02/' $seed.param

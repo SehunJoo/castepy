@@ -8,65 +8,76 @@ if [ $# -ne 1 ]; then
 fi
 
 seed=$1
-dir=${PWD##*/}
-newdir=$(echo $dir | awk 'BEGIN{FS="opt"}{n = $2 + 1; printf "%sopt%d", $1, n}')
+
+# get directory name (should be like geomopt1 cellopt1)
+
+workdir=${PWD%/*}
+subdir=${PWD##*/}
+subdir=${subdir%%-*}
+subdir=${subdir%%_*}
+newsubdir=$(echo $subdir | awk 'BEGIN{FS="opt"}{n = $2 + 1; printf "%sopt%d", $1, n}')
 
 
-echo "current directory: $dir"
-echo "new directory: $newdir"
+# each directory for single jobscript (several repeats of runs)
+
+[[ -d $workdir/$newsubdir ]] && echo -e "\n$newsubdir direcotry already exists\n" && exit 0
+
+echo
+echo -e "working directory : $workdir"
+echo -e "current directory : $subdir"
+echo -e "new directory     : $newsubdir"
 echo
 
+# make new directory for new job
 
-
-
-# make new directory
-
-mkdir ../$newdir;
-ls -l --color ../
+mkdir $workdir/$newsubdir
+ls -l -v --color $workdir
 echo
+
 
 # Trap a crashing of the code (by wall clock limit)
 
-crashed=`tail -20 $seed.castep | grep "Total time          = " | awk '{print $1}'`
+crashed=$(tail -20 $seed.castep | grep "Total time          = " | awk '{print $1}')
 
-if [[ $crashed != Total ]]
+if [[ $crashed != 'Total' ]]
 then
-    if [[ -f $seed.check_bak ]]
-    then
-        echo "restart using $seed.check_bak ..."
-
-        cp jobscript* ../$newdir
-        cp $seed{.cell,.param} ../$newdir
-        cp $seed.check_bak ../$newdir/$seed.check
-
-    elif [[ -f $seed.check ]]
-    then 
-        echo "restart using $seed.check ..."
-
-        cp jobscript* ../$newdir
-        cp $seed{.cell,.param} ../$newdir
-        cp $seed.check ../$newdir/$seed.check
-    else
-        echo "restart from input structure of final run ..."
-
-        cp jobscript* ../$newdir
-        cp $seed{.cell,.param} ../$newdir
-        param-task geoemetryoptimization
-    fi
+    echo "status  : forcibly termiated by wall clock limit"
 else
-    cp $seed{.cell,.param,.castep,-out.cell} jobscript* ../$newdir
-    cd ../$newdir
-    new_cell $seed
-    rm -rf $seed{.castep,-out.cell}
-    
+    echo "status  : successful termination"
+fi
 
 # copy input files
 
+cp jobscript*            $workdir/$newsubdir
+cp $seed{.cell,.param}   $workdir/$newsubdir
 
 
+if [[ -f $seed.check ]]
+then 
+    echo "restart : using $seed.check ..."
+    cp $seed.check       $workdir/$newsubdir/$seed.check
 
-ls -l --color
+elif [[ -f $seed.check_bak ]]
+then
+    # if you fail to restart with seed.check, consdier to use seed.check_bak
+    echo "restart : using $seed.check_bak ..."
+    cp $seed.check_bak   $workdir/$newsubdir/$seed.check
 
+else
+    echo "restart : using input structure of final run ..."
+    cp $seed{.castep,-out.cell} $workdir/$newsubdir
+    (
+        cd $workdir/$newsubdir
+        new_cell $seed
+        rm -rf $seed{.castep,-out.cell}
+    )
+fi
+
+cd $workdir/$newsubdir
+echo
+ls -l -v --color
+param-task geometryoptimization
 pwd
+echo
 
 exit 0

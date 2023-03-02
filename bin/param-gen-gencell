@@ -75,6 +75,6 @@ bs_write_eigenvalues : false
 calculate_stress     : true
 EOF
 
-cat $seed-gencell.param
+#cat $seed-gencell.param
 
 exit 0

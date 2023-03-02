@@ -40,8 +40,6 @@ fi
 
 rm -f $seed.cell.temp
 
-dos2unix $seed.cell 1> /dev/null 2>&1
-
 # backup
 
 md5=`md5sum $seed.cell | cut -c 1-8`
@@ -84,7 +82,6 @@ echo
     echo "SYMMETRY_GENERATE"; echo "SNAP_TO_SYMMETRY"; echo;
     sed -n -e '/^FIX/                                                           p' $seed.cell; echo;
     sed -n -e '/^%BLOCK IONIC_CONSTRAINTS/   , /^%ENDBLOCK IONIC_CONSTRAINTS/   p' $seed.cell; echo;
-    sed -n -e '/^%BLOCK EXTERNAL_EFIELD/     , /^%ENDBLOCK EXTERNAL_EFIELD/     p' $seed.cell; echo;
     sed -n -e '/^%BLOCK EXTERNAL_PRESSURE/   , /^%ENDBLOCK EXTERNAL_PRESSURE/   p' $seed.cell; echo;
     echo "%BLOCK SPECIES_POT"; echo "C19"; echo "%ENDBLOCK SPECIES_POT"; echo;
 ) >> $seed.cell.temp
@@ -98,8 +95,11 @@ echo "simplify Hubbard_U block"
     echo ""
 ) >> $seed.cell.temp
 
-
 mv $seed.cell.temp $seed.cell
-cat $seed.cell
+
+# convert dos2unix
+sed -i 's/\r$//g' $seed.cell
+
+#cat $seed.cell
 
 exit 0

@@ -74,14 +74,15 @@ function casplit {
 
     # split concatenated castep file
 
-    echo "split $seed.castep files if concatenated ..."
+    echo "split the $seed.castep file if concatenated ..."
 
-    rm -f $seed-split*
+    [[ ! -e $seed.castep ]] && echo "$seed.castep not found ..." && exit 1
 
-    if [[ -e $seed.castep ]]; then
-        csplit -s -z -f $seed -b -split-%02d.castep $seed.castep '/CCC   AA    SSS  TTTTT  EEEEE  PPPP/' {*}
-        rm -f $seed-split-00.castep
-    fi
+    rm -f $seed-run-*.castep
+
+    csplit -s -z -f $seed -b -run-%02d.castep $seed.castep '/CCC   AA    SSS  TTTTT  EEEEE  PPPP/' {*}
+
+    rm -f $seed-run-00.castep
 }
 
 function parsing {
@@ -89,18 +90,18 @@ function parsing {
     # loop over splitted ${seed}.castep file
 
     header='true'
-    for f in $(ls $seed-split-*.castep)
+    for f in $(ls $seed-run-*.castep)
     do
-        seedsplit=${f%%.castep}
+        seedrun=${f%%.castep}
 
-        echo "parsing $seedsplit.castep file ..."
+        echo "parsing $seedrun.castep file ..."
 
         ## get input from ${seed}.castep file
         input=''
-        input=$(sed -n -r '/^ \*+ Title \*+/,/^\+\-+ MEMORY/p' $seedsplit.castep)
+        input=$(sed -n -r '/^ \*+ Title \*+/,/^\+\-+ MEMORY/p' $seedrun.castep)
         #echo "$input"; exit 1
 
-        [[ -z $input ]] && echo "Input parameters not found ..." && exit 1
+        [[ -z $input ]] && echo "Input parameters not found ..." && continue
 
 
         ## parse General Parameters
@@ -179,12 +180,14 @@ function parsing {
         ## parse Geometry Optimization Parameters
 
         fixed_npw=''
+        geom_spin_fix=''
         geom_energy_tol=''
         geom_force_tol=''
         geom_disp_tol=''
         geom_stress_tol=''
 
         fixed_npw=$(echo "$input" | grep "variable cell method" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
+        geom_spin_fix=$(echo "$input" | sed -n '/^  with spin/p' | head -1 | awk 'BEGIN {FS="for all steps"} {print $1}' | awk '{print $NF}')
         geom_energy_tol=$(echo "$input" | grep "total energy convergence tolerance" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
         geom_force_tol=$(echo "$input" | grep "max ionic |force| tolerance" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
         geom_disp_tol=$(echo "$input" | grep "max ionic |displacement| tolerance" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
@@ -364,14 +367,14 @@ function parsing {
         ## check if geometry optimization is done successfully
 
         stat=''
-        if [[ $(tail -20 $seedsplit.castep | grep "Total time          = " | awk '{print $1}') != "Total" ]]; then
+        if [[ $(tail -20 $seedrun.castep | grep "Total time          = " | awk '{print $1}') != "Total" ]]; then
             stat='ongoing'
         elif [[ $task == 'single point energy' ]]; then
             stat='NULL'
         elif [[ $task == 'geometry optimization' ]]; then
-            if [[ $(sed -n '/Geometry optimization/p' $seedsplit.castep | sed -n '/failed/p' | wc -l) -eq 1 ]]; then
+            if [[ $(sed -n '/Geometry optimization/p' $seedrun.castep | sed -n '/failed/p' | wc -l) -eq 1 ]]; then
                 stat='failed'
-            elif [[ $(sed -n '/Geometry optimization/p' $seedsplit.castep | sed -n '/completed/p' | wc -l) -eq 1 ]]; then
+            elif [[ $(sed -n '/Geometry optimization/p' $seedrun.castep | sed -n '/completed/p' | wc -l) -eq 1 ]]; then
                 stat='completed'
             else
                 stat='error-checkfile'
@@ -380,16 +383,16 @@ function parsing {
             echo "check task" && exit 1
         fi
 
-        niter=$(sed -n '/LBFGS: finished iteration/p' $seedsplit.castep | tail -n 1 | awk '{print $4}')
+        niter=$(sed -n '/LBFGS: finished iteration/p' $seedrun.castep | tail -n 1 | awk '{print $4}')
         [[ -z $niter ]] && niter='NaN'
 
         ## parse final configuration
 
         fconfig=''
         if [[ $task == 'single point energy' ]]; then
-            fconfig=$(cat $seedsplit.castep)
+            fconfig=$(cat $seedrun.castep)
         elif [[ $task == 'geometry optimization' ]]; then
-            fconfig=$(sed -n '/LBFGS: Final Configuration/,/Total time          =/p' $seedsplit.castep)
+            fconfig=$(sed -n '/LBFGS: Final Configuration/,/Total time          =/p' $seedrun.castep)
         fi
         
         [[ -z $fconfig ]] && echo "Final Configuration not found ..." && continue
@@ -445,18 +448,18 @@ function parsing {
 
         #spin=''
         #modspin=''
-        #spin=$(grep " Spin Den" $seedsplit.castep 2> /dev/null | tail -1 | awk '{print $5}')
-        #modspin=$(grep " |Spin Den" $seedsplit.castep 2> /dev/null | tail -1 | awk '{print $5}')
+        #spin=$(grep " Spin Den" $seedrun.castep 2> /dev/null | tail -1 | awk '{print $5}')
+        #modspin=$(grep " |Spin Den" $seedrun.castep 2> /dev/null | tail -1 | awk '{print $5}')
 
 
         ## parse Mulliken Spin (atom)
 
         echo "$fconfig" | sed -n '/Total   Charge(e)   Spin(hbar\/2)/,/Spin       Length (A)/p' \
-         | sed '/==/,/==/!d;//d' | grep -v "dn" | tail -n $nions | awk '{print $1, $10}' > mullikenspin.dat
+         | sed '/==/,/==/!d;//d' | grep -v "dn" | tail -n $nions | awk '{print $1, $10}' > data-mullikenspin.dat
 
         #cat mullikenspin.dat | awk '{printf "%s=%.2f\n", $1, $2}' | sort -k 1 -u
 
-        ion_spin=$(cat mullikenspin.dat | awk '{printf "%s=%.2f\n", $1, $2}' | sort -k 1 -u | awk '{printf "%s, ",$1}')
+        ion_spin=$(cat data-mullikenspin.dat | awk '{printf "%s=%.2f\n", $1, $2}' | sort -k 1 -u | awk '{printf "%s, ",$1}')
 
 
         # save as tsv
@@ -508,22 +511,25 @@ function parsing {
 
         header='false'
 
-        castep2res $seedsplit > $seedsplit-out.res
+        castep2res $seedrun > $seedrun-out.res
     done
 
     ## generate res file ...
 
     castep2res $seed > $seed-out.res
 
-    echo && catcsv data-input-param.tsv && echo
-    echo && catcsv data-input-cell.tsv && echo
-    echo && catcsv data-output.tsv && echo 
-
     echo "for copying to sheet..."
 
     echo && cat data-input-param.tsv && echo
     echo && cat data-input-cell.tsv && echo
     echo && cat data-output.tsv && echo 
+
+    echo "for pretty print..."
+
+    echo && catcsv data-input-param.tsv && echo
+    echo && catcsv data-input-cell.tsv && echo
+    echo && catcsv data-output.tsv && echo 
+
 }
 
 

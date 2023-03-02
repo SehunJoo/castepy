@@ -48,9 +48,20 @@ echo -e $endcolor
 
 ## loop over (keyword and value) pairs in seed.param
 
+if [[ $(which castep 2>/dev/null | wc -l) -ne 0 ]]
+then
+    executable='castep'
+elif [[ $(which castep.mpi 2>/dev/null | wc -l) -ne 0 ]]
+then
+    executable='castep.mpi'
+else
+    echo "castep not found" && exit 1
+fi
+
 for key in $(awk 'BEGIN {FS=":"} {print $1}' $seed.param | awk '{print tolower($1)}')
 do
-    default=$(castep -h $key | grep 'Default value : ' | awk 'BEGIN {FS=": "} {print tolower($2)}')
+        
+    default=$($executable -h $key | grep 'Default value : ' | awk 'BEGIN {FS=": "} {print tolower($2)}')
     val=$default
 
     [[ $key == 'spin_polarized' ]] && val='true'
@@ -67,6 +78,6 @@ do
     [[ $val != $default ]] && printf "%-25s : %s\n" $key "$val ## $default" >> $seed-default.param
 done
 
-cat $seed-default.param
+#cat $seed-default.param
 
 exit 0
