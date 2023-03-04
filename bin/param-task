@@ -19,27 +19,100 @@ if [ $# -lt 1 ]; then
     usage
 fi
 
-task=$1
+case $1 in
+    singlepoint | geometryoptimization)
+        task=$1
+        ;;
+    workfunction) # user-defined
+        task=$1
+        ;;
+    *)
+        echo "invalid option: $1"
+        usage
+        ;;
+esac
+
+# main
 
 for seed in $(ls *.param | awk 'BEGIN {FS=".param"} {print $1}')
 do
-    echo "$seed.param"
+    echo -e "change $seed.param : task to $task\n"
+
 
     if [[ $task == "singlepoint" ]]
     then
-        sed -i 's/^task [[:print:]]*/task                      : singlepoint/' $seed.param
+        # single point energy calculation
+        # seed.castep_bin : population analysis
+        # seed.check      : required to restart if SCF fails to converge
 
-        sed -i 's/^write_checkpoint [[:print:]]*/write_checkpoint          : all/' $seed.param
-        sed -i 's/^write_cst_esp [[:print:]]*/write_cst_esp             : true/' $seed.param
-        sed -i 's/^write_bands [[:print:]]*/write_bands               : true/' $seed.param
+        keys="task write_checkpoint backup_interval continuation"
 
-        sed -i '/backup_interval [[:print:]]*/d' $seed.param
-        echo "backup_interval           : 82800" >> $seed.param
-        sed -i '/continuation [[:print:]]*/d' $seed.param
-        echo "continuation              : default" >> $seed.param
+        for key in $keys
+        do
+            nkey=$(sed -n "/^$key/p" $seed.param | wc -l)
+            if [[ $nkey -ne 1 ]]
+            then
+                sed -i "/^$key/d" $seed.param
+                printf "%-25s : \n" "$key" >> $seed.param
+            fi
+        done
+
+        sed -i 's/^task [[:print:]]*/task                      : singlepoint/'      $seed.param
+        sed -i 's/^write_checkpoint [[:print:]]*/write_checkpoint          : all/'  $seed.param
+        sed -i 's/^backup_interval [[:print:]]*/backup_interval           : 82800/' $seed.param
+        sed -i 's/^continuation [[:print:]]*/continuation              : default/'  $seed.param
+
+        for key in $keys
+        do
+            sed -n "/^$key/p" $seed.param
+        done
+
+        echo -e "\n** for additional analysis **\n"
+        echo -e "$(basename $0) workfunction\n"
+
+    elif [[ $task == "workfunction" ]]
+    then
+        # work function calculation
+        # seed.cst_esp : electrostatic potential data
+        # seed.bands   : Fermi energy
+
+        keys="write_cst_esp write_bands"
+
+        for key in $keys
+        do
+            nkey=$(sed -n "/^$key/p" $seed.param | wc -l)
+            if [[ $nkey -ne 1 ]]
+            then
+                sed -i "/^$key/d" $seed.param
+                printf "%-25s : \n" "$key" >> $seed.param
+            fi
+        done
+
+        sed -i 's/^write_cst_esp [[:print:]]*/write_cst_esp             : true/'  $seed.param
+        sed -i 's/^write_bands [[:print:]]*/write_bands               : true/'     $seed.param
+
+        for key in $keys
+        do
+            sed -n "/^$key/p" $seed.param
+        done
 
     elif [[ $task == "geometryoptimization" ]]
     then
+        # backup_interval and num_backup_iter options cannot speciifed together
+        # Error in parameters file: duplication with keywords BACKUP_INTERVAL and NUM_BACKUP_ITER
+
+        keys="task write_checkpoint write_cst_esp write_bands backup_interval continuation"
+
+        for key in $keys
+        do
+            nkey=$(sed -n "/^$key/p" $seed.param | wc -l)
+            if [[ $nkey -ne 1 ]]
+            then
+                sed -i "/^$key/d" $seed.param
+                printf "%-25s : \n" "$key" >> $seed.param
+            fi
+        done
+
         sed -i 's/^task [[:print:]]*/task                      : geometryoptimization/' $seed.param
 
         sed -i 's/^write_checkpoint [[:print:]]*/write_checkpoint          : all/' $seed.param
@@ -47,15 +120,20 @@ do
         sed -i 's/^write_bands [[:print:]]*/write_bands               : false/' $seed.param
 
 
-        # both options cannot speciifed together
-        # Error in parameters file: duplication with keywords BACKUP_INTERVAL and NUM_BACKUP_ITER
-        sed -i '/backup_interval [[:print:]]*/d' $seed.param
-        sed -i '/num_backup_iter [[:print:]]*/d' $seed.param
-        echo "backup_interval           : 300" >> $seed.param
-        #echo "num_backup_iter           : 5" >> $seed.param
+        sed -i 's/backup_interval [[:print:]]*/backup_interval           : 300/' $seed.param
+        #sed -i 's/num_backup_iter [[:print:]]*/num_backup_iter           : 5/' $seed.param
 
-        sed -i '/continuation [[:print:]]*/d' $seed.param
-        echo "continuation              : default" >> $seed.param
+        sed -i 's/continuation [[:print:]]*/continuation              : default/' $seed.param
+
+        for key in $keys
+        do
+            sed -n "/^$key/p" $seed.param
+        done
+
+        echo -e "\n** for changing tolerance **\n"
+        echo -e "param-tol express\n"
+        echo -e "param-tol default\n"
+        echo -e "param-tol ultrafine\n"
     else
         echo "$task is not available"
         exit 1

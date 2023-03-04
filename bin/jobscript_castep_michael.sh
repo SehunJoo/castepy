@@ -1,33 +1,32 @@
 #!/bin/bash -l
 
-#SBATCH --job-name=castep
-#SBATCH --time=00:20:00
-#SBATCH --nodes=4
-#SBATCH --tasks-per-node=64
-#SBATCH --cpus-per-task=2
-#SBATCH --array=1-1
-#SBATCH --account=e89-camm
-#SBATCH --partition=standard
-#SBATCH --qos=short
+#$ -N castep
+#$ -ac allow=A
+#$ -pe mpi 200
+#$ -t 1-1
+#$ -l mem=4G
+#$ -l h_rt=48:00:00
+#$ -A Faraday_FCAT
+#$ -P Gold
+#$ -cwd
+#$ -S /bin/bash
+#$ -m n
 
 # --------------------------------------------------
 
-source /work/e89/e89/shj29/.bashrc
-#module load PrgEnv-gnu
-#module load castep/22.11
-
+source ~/.bashrc
 
 # set variables
 
-workdir="${SLURM_SUBMIT_DIR}"
-jobid="${SLURM_ARRAY_JOB_ID}"
-taskid="${SLURM_ARRAY_TASK_ID}"
+workdir="${SGE_O_WORKDIR}"
+jobid="${JOB_ID}"
+taskid="${SGE_TASK_ID}"
 jids="${jobid}.${taskid}"
 prefix=".spawnpids"
 
 cmdline='castep'
 program='castep'
-mpinp='256'
+mpinp='250'
 export OMP_NUM_THREADS=1
 
 t_submit='2023-02-27 18:21:36'
@@ -46,15 +45,31 @@ echo "start_time:         ${t_start}"                   >> ${prefix}.${jids}
 
 seed=$(ls *.param)
 seed=${seed%.param}
-for i in {1..3}
+
+# spe
+
+# geomopt
+niter=4
+for (( i = 1; i <= $niter; i++ ))
 do
+    if [[ $i -eq 1 ]]
+    then
+        echo
+        #sed -i 's/^task [[:print:]]*/task                      : singlepoint/' $seed.param
+        #sed -i 's/^metals_method [[:print:]]*/metals_method             : edft/' $seed.param
+    else
+        sed -i 's/^task [[:print:]]*/task                      : geometryoptimization/' $seed.param
+        sed -i 's/^metals_method [[:print:]]*/metals_method             : dm/' $seed.param
+    fi
+
     seedrun=$(echo $seed $i | awk '{printf "%s-run-%02d", $1, $2}')
-    srun --distribution=block:block --hint=nomultithread castep.mpi $seed
+    mpirun -n $mpinp castep.mpi $seed
     cp $seed.cell     $seedrun.cell
     cp $seed-out.cell $seedrun-out.cell
+    [[ $(ls $seed.*.err 2>/dev/null | wc -l) -gt 0 ]] && cat $seed.*.err  > $seedrun.err && rm -rf $seed.*.err
 
     stat=$(tail -20 $seed.castep | grep "Total time          = " | awk '{print $1}')
-    [[ $stat != Total ]] && new_cell $seed
+    [[ $stat == Total ]] && new_cell $seed
 done
 
 

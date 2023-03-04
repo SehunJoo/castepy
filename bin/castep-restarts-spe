@@ -2,32 +2,72 @@
 
 set -e
 
-seed=$(ls *.param | awk 'BEGIN {FS=".param"} {print $1}')
-dir=$(pwd | awk 'BEGIN{FS="/"}{print $NF}')
-newdir=${dir}_spe
+if [ $# -ne 1 ]; then
+    echo 1>&2 "Usage: $(basename $0)  <seed>"
+    exit 127
+fi
 
-echo "current directory: $dir"
-echo "new directory: $newdir"
+seed=$1
+
+# get the name of the working directory and its paraent directory
+
+parpath=${PWD%/*}  # path of the parent directory
+workdir=${PWD##*/} # name of the current working directory
+newdir=${workdir}_spe  # name of the new directory
+
+# check before proceeding
+
+[[ -d $parpath/$newdir ]] && echo -e "\n$newdir directory already exists\n" && exit 0
+
+echo
+echo -e "path of parent directory : $parpath"
+echo -e "current directory        : $workdir"
+echo -e "new directory            : $newdir"
 echo
 
 # make new directory
 
-mkdir ../$newdir;
-ls -l --color ../
-echo
+mkdir $parpath/$newdir
+echo && ls -l -v --color $parpath && echo
 
 # copy input files
 
-cp $seed{.cell,.param} ../$newdir
-ls -l --color ../$newdir
-echo
+cp $parpath/$workdir/$seed{.cell,.param} $parpath/$newdir
+
+if [[ -f $seed.check ]]
+then
+    echo "restart : using $seed.check ..."
+    cp $parpath/$workdir/$seed.check     $parpath/$newdir
+else
+    echo "restart : using final structure ..."
+    cp $parpath/$workdir/$seed.castep    $parpath/$newdir
+    cp $parpath/$workdir/$seed-out.cell   $parpath/$newdir
+
+    cd $parpath/$newdir
+    new_cell $seed
+    rm -f $parpath/$newdir/$seed.castep
+    rm -f $parpath/$newdir/$seed-out.cell
+fi
+
+if ls $parpath/$workdir/jobscript* &>/dev/null
+then
+    cp $parpath/$workdir/jobscript*          $parpath/$newdir
+
+    echo "change jobscript: number of iterations to 1 ..."
+    sed -i 's/^niter[[:print:]]*/niter=1/g'    $parpath/$newdir/jobscript*
+else
+    echo "jobsript not found ..."
+fi
+
+
+echo && ls -l -v --color $parpath/$newdir && echo
 
 # modify param file
 
-cd ../$newdir
-pwd
-
+cd $parpath/$newdir
 param-task singlepoint
+
+echo -e "\ncd $parpath/$newdir\n"
 
 
 exit 0

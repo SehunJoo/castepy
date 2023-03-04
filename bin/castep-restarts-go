@@ -77,7 +77,7 @@ cd $workdir/$newsubdir
 echo
 ls -l -v --color
 param-task geometryoptimization
-pwd
+echo "cd $workdir/$newsubdir"
 echo
 
 exit 0

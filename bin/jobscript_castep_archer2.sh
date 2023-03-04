@@ -50,8 +50,8 @@ seed=${seed%.param}
 # spe
 
 # geomopt
-
-for i in {1..4}
+niter=4
+for (( i = 1; i <= $niter; i++ ))
 do
     if [[ $i -eq 1 ]]
     then
