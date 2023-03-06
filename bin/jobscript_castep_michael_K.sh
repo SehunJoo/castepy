@@ -1,8 +1,8 @@
 #!/bin/bash -l
 
 #$ -N castep
-#$ -ac allow=A
-#$ -pe mpi 200
+#$ -ac allow=K
+#$ -pe mpi 48
 #$ -t 1-1
 #$ -l mem=4G
 #$ -l h_rt=48:00:00
@@ -26,7 +26,7 @@ prefix=".spawnpids"
 
 cmdline='castep'
 program='castep'
-mpinp='200'
+mpinp='48'
 export OMP_NUM_THREADS=1
 
 t_submit='2023-02-27 18:21:36'

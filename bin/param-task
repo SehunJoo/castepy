@@ -131,9 +131,9 @@ do
         done
 
         echo -e "\n** for changing tolerance **\n"
-        echo -e "param-tol express\n"
-        echo -e "param-tol default\n"
-        echo -e "param-tol ultrafine\n"
+        echo -e "param-tol express"
+        echo -e "param-tol default"
+        echo -e "param-tol ultrafine"
     else
         echo "$task is not available"
         exit 1

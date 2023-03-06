@@ -395,7 +395,7 @@ function parsing {
             fconfig=$(sed -n '/LBFGS: Final Configuration/,/Total time          =/p' $seedrun.castep)
         fi
         
-        [[ -z $fconfig ]] && echo "Final Configuration not found ..." && continue
+        [[ -z $fconfig ]] && echo "Final Configuration not found ..."
             
         ## parse Unit Cell
 
@@ -461,7 +461,6 @@ function parsing {
 
         ion_spin=$(cat data-mullikenspin.dat | awk '{printf "%s=%.2f\n", $1, $2}' | sort -k 1 -u | awk '{printf "%s, ",$1}')
 
-
         # save as tsv
 
         if [[ $header == 'true' ]]; then        
@@ -511,7 +510,7 @@ function parsing {
 
         header='false'
 
-        castep2res $seedrun > $seedrun-out.res
+        [[ -z $fconig ]] && castep2res $seedrun > $seedrun-out.res
     done
 
     ## generate res file ...

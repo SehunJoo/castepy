@@ -63,14 +63,18 @@ then
     echo "restart : using $seed.check_bak ..."
     cp $seed.check_bak   $workdir/$newsubdir/$seed.check
 
-else
-    echo "restart : using input structure of final run ..."
+elif [[ -f $seed-out.cell ]] && [[ -f $seed.castep ]]
+then
+    echo "restart : using final structure of final run ..."
+
     cp $seed{.castep,-out.cell} $workdir/$newsubdir
     (
         cd $workdir/$newsubdir
         new_cell $seed
         rm -rf $seed{.castep,-out.cell}
     )
+else
+    echo "restart : using input or intermediate structure ..."
 fi
 
 cd $workdir/$newsubdir
