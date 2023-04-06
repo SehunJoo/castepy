@@ -1,0 +1,5 @@
+#!/bin/bash
+
+rm -f castep.{e*,o*,pe*,po*}
+rm -f DONE_*
+rm -f .spawnpid*
