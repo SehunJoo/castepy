@@ -1,0 +1,63 @@
+#!/bin/bash
+
+set -e
+
+color='\033[1\0;31m'
+endcolor='\033[0m'
+
+function usage {
+    echo 1>&2 -e $color
+    echo 1>&2 -e "usage: $(basename $0)"
+    echo 1>&2 -e $endcolor
+    echo 1>&2 "$(basename $0)"
+    echo 1>&2
+    exit 1
+}
+
+if [ $# -lt 0 ]; then
+    usage
+fi
+
+opt=$1
+
+for seed in $(ls *.param | awk 'BEGIN {FS=".param"} {print $1}')
+do
+    echo "$seed.param"
+
+    grep -v -i "spin " $seed.param > $seed.param.temp
+    totspin=$(grep 'SPIN=' $seed.cell| awk 'BEGIN {FS="SPIN="}; { sum += $2 } END {print sum}')
+
+    [[ -z $totspin ]] && totspin=0
+
+    echo "spin : $totspin" >> $seed.param.temp
+    mv $seed.param.temp $seed.param
+
+
+
+    # spin initialization
+    #if [[ `grep "SPIN=" $seed.cell | wc -l` -gt 0 ]]; then
+    #
+    #    nlines=`sed -n '/[pP][oO][sS][iI][tT][iI][oO][nN][sS]/{=; q;}' $seed.cell`
+    #    printf "\n" > $seed.spin
+    #    for (( j = 2 ; j <= $nlines; j++ ))
+    #    do  
+    #        printf "\n" >> $seed.spin
+    #    done
+    #    
+    #    nions=`grep "Total number of ions in cell =" $seed.castep | tail -1 | awk '{print $8}'`
+    #    
+    #    sed -n '/Total  Charge (e)  Spin (hbar\/2)/,/Spin       Length (A)/p' $seed.castep | sed '/==/,/==/!d;//d' | awk '{print "SPIN=",$9}'| tail -$nions >> $seed.spin
+    #    sed -n '/Total  Charge(e)   Spin(hbar\/2)/,/Spin       Length (A)/p' $seed.castep | sed '/==/,/==/!d;//d' | grep -v dn | awk '{print "SPIN=",$10}'| tail -$nions >> $seed.spin
+    #    sed -n '/Total   Charge(e)   Spin(hbar\/2)/,/Spin       Length (A)/p' $seed.castep | sed '/==/,/==/!d;//d' | grep -v dn | awk '{print "SPIN=",$10}'| tail -$nions >> $seed.spin
+    #    
+    #    awk 'BEGIN { FS="SPIN=" };{print $1}' $seed.cell | paste - $seed.spin | expand > $seed.cell.temp
+    #    
+    #    mv $seed.cell.temp $seed.cell
+    #    rm $seed.spin
+    #
+    #fi
+
+
+done
+
+exit 0

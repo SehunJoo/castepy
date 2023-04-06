@@ -383,7 +383,7 @@ function parsing {
             echo "check task" && exit 1
         fi
 
-        niter=$(sed -n '/LBFGS: finished iteration/p' $seedrun.castep | tail -n 1 | awk '{print $4}')
+        niter=$(sed -n '/: finished iteration/p' $seedrun.castep | tail -n 1 | awk '{print $4}')
         [[ -z $niter ]] && niter='NaN'
 
         ## parse final configuration
@@ -392,7 +392,7 @@ function parsing {
         if [[ $task == 'single point energy' ]]; then
             fconfig=$(cat $seedrun.castep)
         elif [[ $task == 'geometry optimization' ]]; then
-            fconfig=$(sed -n '/LBFGS: Final Configuration/,/Total time          =/p' $seedrun.castep)
+            fconfig=$(sed -n '/: Final Configuration/,/Total time          =/p' $seedrun.castep)
         fi
         
         [[ -z $fconfig ]] && echo "Final Configuration not found ..."

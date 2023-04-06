@@ -9,7 +9,7 @@ function usage {
     echo 1>&2 -e $color
     echo 1>&2 -e "usage: $(basename $0) [on/off]" 2>&1
     echo 1>&2 -e $endcolor
-    echo 1>&2 "$(basename $0)  on"
+    echo 1>&2 "$(basename $0)  0.03"
     echo 1>&2 "$(basename $0)  off"
     echo 1>&2
     exit 1
@@ -17,19 +17,22 @@ function usage {
 
 # check before proceeding
 
-if [ $# -lt 1 ]; then
+if [ $# -ne 1 ]; then
     usage
 fi
 
-case $1 in
-    on | off)
-        kpoints=$1
-        ;;
-    *)
-        echo "invalid option: $1"
-        usage
-        ;;
-esac
+kpoints=$1
+
+#case $1 in
+#    on | off)
+#        kpoints=$1
+#        ;;
+#    *)
+#        kpoints=$1
+#        #echo "invalid option: $1"
+#        #usage
+#        ;;
+#esac
 
 # main
 
@@ -37,20 +40,18 @@ for seed in $(ls *.cell | awk 'BEGIN {FS=".cell"} {print $1}')
 do
     echo "$seed.cell"
 
-    if [[ $kpoints == "on" ]]
-    then
-        nlines=$(sed -i '/^KPOINTS_MP_SPACING/d' $seed.cell | wc -l)
-        if [[ $nlines -eq 0 ]]
-        then
-            echo >> $seed.cell
-            echo "KPOINTS_MP_SPACING 0.07" >> $seed.cell
-        fi
+    [[ $(sed -n '/^KPOINTS_MP_SPACING /p'   $seed.cell | wc -l) -gt 1 ]] && echo "Error: kpoints_mp_spacing keyword" && exit 1
 
-    elif [[ $kpoints == "off" ]]
+    [[ $(sed -n '/^KPOINTS_MP_SPACING /p'   $seed.cell | wc -l) -lt 1 ]] && echo "KPOINTS_MP_SPACING "      >> $seed.cell
+
+    if [[ $kpoints == "off" ]]
     then
         sed -i '/^KPOINTS_MP_SPACING[[:print:]]*/d' $seed.cell
         sed -i '/^#KPOINTS_MP_SPACING[[:print:]]*/d' $seed.cell
+    else
+            sed -i "s/KPOINTS_MP_SPACING [[:print:]]*/KPOINTS_MP_SPACING $kpoints/" $seed.cell
     fi
+
 done
 
 exit 0

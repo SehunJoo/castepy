@@ -45,7 +45,7 @@ do
         # seed.castep_bin : population analysis
         # seed.check      : required to restart if SCF fails to converge
 
-        keys="task write_checkpoint backup_interval continuation"
+        keys="task write_checkpoint backup_interval continuation reuse"
 
         for key in $keys
         do
@@ -58,9 +58,11 @@ do
         done
 
         sed -i 's/^task [[:print:]]*/task                      : singlepoint/'      $seed.param
-        sed -i 's/^write_checkpoint [[:print:]]*/write_checkpoint          : all/'  $seed.param
-        sed -i 's/^backup_interval [[:print:]]*/backup_interval           : 82800/' $seed.param
         sed -i 's/^continuation [[:print:]]*/continuation              : default/'  $seed.param
+        sed -i '/^reuse [[:print:]]*/d'                                             $seed.param
+
+        sed -i 's/^backup_interval [[:print:]]*/backup_interval           : 600/'   $seed.param
+        sed -i 's/^write_checkpoint [[:print:]]*/write_checkpoint          : all/'  $seed.param
 
         for key in $keys
         do
@@ -76,7 +78,8 @@ do
         # seed.cst_esp : electrostatic potential data
         # seed.bands   : Fermi energy
 
-        keys="write_cst_esp write_bands"
+        keys="task write_checkpoint backup_interval continuation reuse"
+        keys="${keys} write_cst_esp write_bands"
 
         for key in $keys
         do
@@ -88,6 +91,12 @@ do
             fi
         done
 
+        sed -i 's/^task [[:print:]]*/task                      : singlepoint/'      $seed.param
+        sed -i 's/^continuation [[:print:]]*/continuation              : default/'  $seed.param
+        sed -i '/^reuse [[:print:]]*/d'                                             $seed.param
+
+        sed -i 's/^backup_interval [[:print:]]*/backup_interval           : 600/'   $seed.param
+        sed -i 's/^write_checkpoint [[:print:]]*/write_checkpoint          : all/'  $seed.param
         sed -i 's/^write_cst_esp [[:print:]]*/write_cst_esp             : true/'  $seed.param
         sed -i 's/^write_bands [[:print:]]*/write_bands               : true/'     $seed.param
 
@@ -101,7 +110,8 @@ do
         # backup_interval and num_backup_iter options cannot speciifed together
         # Error in parameters file: duplication with keywords BACKUP_INTERVAL and NUM_BACKUP_ITER
 
-        keys="task write_checkpoint write_cst_esp write_bands backup_interval continuation"
+        keys="task write_checkpoint backup_interval continuation reuse"
+        keys="${keys} write_cst_esp write_bands"
 
         for key in $keys
         do
@@ -114,16 +124,15 @@ do
         done
 
         sed -i 's/^task [[:print:]]*/task                      : geometryoptimization/' $seed.param
-
-        sed -i 's/^write_checkpoint [[:print:]]*/write_checkpoint          : all/' $seed.param
-        sed -i 's/^write_cst_esp [[:print:]]*/write_cst_esp             : false/' $seed.param
-        sed -i 's/^write_bands [[:print:]]*/write_bands               : false/' $seed.param
-
+        sed -i '/continuation [[:print:]]*/d'                              $seed.param
+        sed -i 's/reuse [[:print:]]*/reuse                     : default/' $seed.param
 
         sed -i 's/backup_interval [[:print:]]*/backup_interval           : 300/' $seed.param
         #sed -i 's/num_backup_iter [[:print:]]*/num_backup_iter           : 5/' $seed.param
+        sed -i 's/^write_checkpoint [[:print:]]*/write_checkpoint          : all/' $seed.param
+        sed -i 's/^write_cst_esp [[:print:]]*/write_cst_esp             : false/'  $seed.param
+        sed -i 's/^write_bands [[:print:]]*/write_bands               : false/'    $seed.param
 
-        sed -i 's/continuation [[:print:]]*/continuation              : default/' $seed.param
 
         for key in $keys
         do

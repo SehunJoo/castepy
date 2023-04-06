@@ -38,6 +38,8 @@ fi
 
 ## checks before proceeding
 
+[[ ! -f $seed.cell ]] && echo "$seed.cell not found ..." && exit 1
+
 rm -f $seed.cell.temp
 
 # backup

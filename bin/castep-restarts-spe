@@ -2,8 +2,13 @@
 
 set -e
 
+color='\033[1\0;31m'
+endcolor='\033[0m'
+
 if [ $# -ne 1 ]; then
-    echo 1>&2 "Usage: $(basename $0)  <seed>"
+    echo 1>&2 -e "$color"
+    echo 1>&2 -e "Usage: $(basename $0)  <seed>"
+    echo 1>&2 -e "$endcolor"
     exit 127
 fi
 
@@ -67,7 +72,9 @@ echo && ls -l -v --color $parpath/$newdir && echo
 cd $parpath/$newdir
 param-task singlepoint
 
+echo -e $color
 echo -e "\ncd $parpath/$newdir\n"
+echo -e $endcolor
 
 
 exit 0
