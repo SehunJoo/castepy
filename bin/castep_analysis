@@ -513,6 +513,8 @@ function parsing {
         [[ -z $fconig ]] && castep2res $seedrun > $seedrun-out.res
     done
 
+    paste data-input-param.tsv data-input-cell.tsv data-output.tsv > data.tsv
+
     ## generate res file ...
 
     castep2res $seed > $seed-out.res
@@ -672,6 +674,7 @@ function dryrun {
 
 casplit
 parsing
+
 
 [[ $opt_conv == 'true' ]] && conv
 
