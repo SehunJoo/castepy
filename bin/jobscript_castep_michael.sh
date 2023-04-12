@@ -7,7 +7,7 @@
 #$ -l mem=4G
 #$ -l h_rt=48:00:00
 #$ -A Faraday_FCAT
-#$ -P Gold
+#$ -P Free
 #$ -cwd
 #$ -S /bin/bash
 #$ -M shj29@cam.ac.uk
@@ -61,7 +61,7 @@ task=$(sed -n '/^task/p' $seed.param  | awk '{print $3}')
 if [[ $task == "singlepoint" ]]; then
 
     stat='none'
-    tol='default'
+    tol='ultrafine'
     elec_method='dm-normal'
 
     param-spin

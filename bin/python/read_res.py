@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import spglib as spg
 import os
 import numpy as np
 import pandas as pd
@@ -14,7 +13,7 @@ seed = 'NiCo2O4-9266-3506-9'
 
 #!/usr/bin/env python
 
-import read_resdef read_res(filename):
+import read_res(filename):
 
     # Create an empty dictionary to store the parsed data
     data = {}
@@ -129,8 +128,3 @@ df_mag.to_csv('df_mag.csv', index=False)
 
 
 exit()
-
-
-def divline():
-    print("="*100,"\n")
-

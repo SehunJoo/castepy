@@ -1,0 +1,16 @@
+#!/bin/bash
+
+set -e
+
+for f in $(ls *.res)
+do
+    lattc=$(awk '/CELL/{print $4}' "$f")
+
+    # Extract fifth column of data
+    fracposz=$(awk '/SFAC/,/END/ {if ($0 !~ /SFAC|END/) print $5}' "$f")
+
+    diff=$(echo "$fracposz" | awk '{print $1}' | sort -nr | awk 'NR==1{max=$1} END{printf "%.13f", max - $1}')
+    
+    thickness=$(echo "$diff $lattc" | awk '{printf "%.13f", $1 * $2 / 10}')
+    echo -e "$f\t$diff\t$thickness"
+done
