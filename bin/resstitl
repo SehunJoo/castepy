@@ -1,0 +1,8 @@
+#!/bin/bash
+
+
+for f in *.res; do
+    sed -i "s/$(awk '/^TITL/{print $2; exit}' "$f")/${f%.res}/g" "$f"
+done
+
+
