@@ -18,8 +18,8 @@ def mp_example():
 
 def get_mpids_formula(formula):
     #docs = mpr.summary.search(formula=formula, fields=["material_id"])
-    docs = mpr.summary.search(formula=formula, is_stable=True, fields=["material_id"])
-    #docs = mpr.summary.search(formula=formula, theoretical=False, fields=["material_id"])
+    #docs = mpr.summary.search(formula=formula, is_stable=True, fields=["material_id"])
+    docs = mpr.summary.search(formula=formula, theoretical=False, fields=["material_id"])
     return [doc.material_id for doc in docs]
     
 def get_mpids_elements(elements):
@@ -34,17 +34,18 @@ def get_mpids_elements(elements):
 def get_structures(mpids):
 
     docs = mpr.summary.search(material_ids=mpids,
-                              fields=["material_id", "formula_pretty", "structure", "symmetry"])
+                              fields=["material_id", "formula_pretty", "nsites", "structure", "symmetry"])
 
     for doc in docs:
         mpid = doc.material_id
         formula = doc.formula_pretty
+        nsites = doc.nsites
         sg = doc.symmetry.symbol
         sg = sg.replace("/","").replace("_","")
         structure = doc.structure
 
         fmt = 'cif'
-        filename = formula + "_" + sg + "_"  + mpid + "." + fmt
+        filename = formula + "-" + str(nsites) + "-" + sg + "-"  + mpid + "." + fmt
         print(filename)
         #print(structure)
         structure.to(filename = filename, fmt = fmt)
@@ -56,4 +57,4 @@ def get_structures(mpids):
 
 mp_fields()
 mp_example()
-get_structures(get_mpids_formula(["Sc"]))
+get_structures(get_mpids_formula(["Ni"]))

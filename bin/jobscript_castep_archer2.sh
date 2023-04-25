@@ -3,8 +3,8 @@
 #SBATCH --job-name=castep
 #SBATCH --time=00:20:00
 #SBATCH --nodes=4
-#SBATCH --tasks-per-node=64
-#SBATCH --cpus-per-task=2
+#SBATCH --tasks-per-node=128
+#SBATCH --cpus-per-task=1
 #SBATCH --array=1-1
 #SBATCH --account=e89-camm
 #SBATCH --partition=standard
@@ -64,7 +64,7 @@ do
     fi
 
     seedrun=$(echo $seed $i | awk '{printf "%s-run-%02d", $1, $2}')
-    srun --distribution=block:block --hint=nomultithread castep.mpi $seed
+    srun --distribution=block:block --hint=nomultithread --exclusive castep.mpi $seed
     cp $seed.cell     $seedrun.cell
     cp $seed-out.cell $seedrun-out.cell
     [[ $(ls $seed.*.err 2>/dev/null | wc -l) -gt 0 ]] && cat $seed.*.err  > $seedrun.err && rm -rf $seed.*.err
