@@ -37,12 +37,20 @@ ncores=$(nproc --all)
 
 [[ $keyword == "kpoints_mp_spacing" ]] && keyword=${keyword^^}
 
+sed -i "s/^task [[:print:]]*/task                      : singlepoint/gi" "$seed.param"
 
 ## Main
 
-[[ $keyword == "cut_off_energy" ]] && values=$(seq -f "%.0f" $first $increment $last)
-[[ $keyword == "fine_grid_scale" ]] && values=$(seq -f "%.1f" $first $increment $last)
-[[ $keyword == "KPOINTS_MP_SPACING" ]] && values=$(seq -f "%.3f" $first $increment $last)
+if [[ $keyword == "cut_off_energy" ]]; then
+    values=$(seq -f "%.0f" "$first" "$increment" "$last")
+elif [[ $keyword == "fine_grid_scale" ]]; then
+    values=$(seq -f "%.1f" "$first" "$increment" "$last")
+elif [[ $keyword == "KPOINTS_MP_SPACING" ]]; then
+    values=$(seq -f "%.3f" "$first" "$increment" "$last")
+else
+    echo "Unknown keyword: $keyword"
+    exit 1
+fi
 
 echo "keyword   :"$keyword
 echo "first     :"$first
@@ -56,42 +64,64 @@ fi
 
 for value in $values; do
 
-    cut=$(sed -n '/^cut_off_energy/p' $seed.param | awk '{printf "%.0f", $3}')
-    gs=$(sed -n '/^grid_scale/p' $seed.param | awk '{printf "%.2f", $3}') 
-    fgs=$(sed -n '/^fine_grid_scale/p' $seed.param | awk '{printf "%.2f", $3}')
-    kpn=$(sed -n '/^KPOINTS_MP_SPACING/p' $seed.cell | awk '{printf "%.3f", $2}')
+    # initialize values
+    
+    cut=$(awk '/^cut_off_energy/ {printf "%.0f", $3}' $seed.param)
+    gs=$(awk '/^grid_scale/ {printf "%.2f", $3}' $seed.param) 
+    fgs=$(awk '/^fine_grid_scale/ {printf "%.2f", $3}' $seed.param)
+    kpn=$(awk '/^KPOINTS_MP_SPACING/ {printf "%.3f", $2}' $seed.cell)
+    
+    gs=${gs:-1.75}   # Use default value if empty
+    fgs=${fgs:-$gs}  # Use gs if fgs is empty
 
-    [ -z $gs ] && gs='1.75'
-    [ -z $fgs ] && fgs=$gs
+    # override the values
 
-    [[ $keyword == "cut_off_energy" ]] && cut=$value
-    [[ $keyword == "fine_grid_scale" ]] && fgs=$value
-    [[ $keyword == "KPOINTS_MP_SPACING" ]] && kpn=$value
+    case "$keyword" in
+        cut_off_energy)
+            cut="$value"
+            ;;
+        fine_grid_scale)
+            fgs="$value"
+            ;;
+        KPOINTS_MP_SPACING)
+            kpn="$value"
+            ;;
+    esac
+
+
+    # prepare input files for a set of parameters
 
     dir="cut${cut}_gs${gs}_fgs${fgs}_kpn${kpn}"
-
-	mkdir $dir
-
-	cp $seed{.cell,.param} *.usp* *pot* $dir
-
-	cd $dir
-
-    [[ $keyword == "cut_off_energy"     ]] && sed -i "s/$keyword [[:print:]]*/$keyword : $cut/gi" $seed.param
-    [[ $keyword == "fine_grid_scale"    ]] && sed -i "s/$keyword [[:print:]]*/$keyword : $fgs/gi" $seed.param
-    [[ $keyword == "KPOINTS_MP_SPACING" ]] && sed -i "s/$keyword [[:print:]]*/$keyword $kpn/gi" $seed.cell
     
+    if [[ ! -d $dir ]]; then
+	    mkdir $dir
+	    cp $seed{.cell,.param} *.usp* *pot* $dir 2>/dev/null
 
-    ## run castep
+	    cd $dir
 
-	mpirun -n $ncores castep.mpi $seed
+        if [[ $keyword == "cut_off_energy" ]]; then
+            sed -i "s/$keyword [[:print:]]*/$keyword : $cut/gi" "$seed.param"
+        elif [[ $keyword == "fine_grid_scale" ]]; then
+            sed -i "s/$keyword [[:print:]]*/$keyword : $fgs/gi" "$seed.param"
+        elif [[ $keyword == "KPOINTS_MP_SPACING" ]]; then
+            sed -i "s/$keyword [[:print:]]*/$keyword $kpn/gi" "$seed.cell"
+        fi
+        
+
+        ## run castep
+
+	    mpirun -n $ncores castep.mpi $seed
+    else
+        cd $dir
+    fi
 
 
     ## parsing
 
-    cut=$(grep "plane wave basis set cut-off" $seed.castep | awk 'BEGIN{FS=":"}{print $2}' | awk '{print $1}')
-    gs=$(grep "size of standard grid" $seed.castep | awk 'BEGIN{FS=":"}{print $2}' | awk '{print $1}') 
-    fgs=$(grep "size of   fine   grid" $seed.castep | awk 'BEGIN{FS=":"}{print $2}' | awk '{print $1}')
-    kpn=$(grep "KPOINTS_MP_SPACING" $seed.cell | awk '{print $2}')
+    cut=$(awk -F':' '/plane wave basis set cut-off/ {print $2}' $seed.castep | awk '{print $1}')
+    gs=$(awk -F':' '/size of standard grid/ {print $2}' $seed.castep | awk '{print $1}') 
+    fgs=$(awk -F':' '/size of   fine   grid/ {print $2}' $seed.castep | awk '{print $1}')
+    kpn=$(awk '/KPOINTS_MP_SPACING/ {print $2}' $seed.cell)
 
     [ -z $fgs ] && fgs=$gs
 	
@@ -113,7 +143,7 @@ for value in $values; do
 
 	# determine number of atoms per UC in order to calculate the total energy per atom
 
-	natoms=$(grep "Total number of ions in cell" $seed.castep | awk 'BEGIN {FS="="}; {print $2}')
+	natoms=$(awk -F'=' '/Total number of ions in cell/ {print $2}' $seed.castep)
 	energy_per_atom=$(python3 -c "print(float('$energy')/float('$natoms'))")
 
 

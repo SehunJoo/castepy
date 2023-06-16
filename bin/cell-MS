@@ -26,13 +26,17 @@ fi
 seed=$1
 
 if [[ $seed == "auto" ]]; then
-    if ! ls *.cell &>/dev/null; then
-        echo 1>&2 "*.cell files not found"
+    cell_files=(*.cell)
+
+    if (( ${#cell_files[@]} == 0 )); then
+        echo "Error: No *.cell files found." >&2
+        exit 1
+    elif (( ${#cell_files[@]} > 1 )); then
+        echo "Error: Too many *.cell files detected. Please provide a single *.cell file." >&2
+        ls *.cell >&2
         exit 1
     else
-        ncell=$(ls *.cell | wc -l)
-        [[ $ncell -gt 1 ]] && echo 1>&2 "too many *.cell files detected ..." && ls *.cell && exit 1
-        [[ $ncell -eq 1 ]] && seed=`ls *.cell | awk 'BEGIN {FS=".cell"} {print $1}'`
+        seed="${cell_files[0]%.cell}"
     fi
 fi
 
@@ -53,7 +57,7 @@ echo -e $color
 echo -e "Cleaning $seed.cell file ..."
 echo -e $endcolor
 
-echo "check $seed.cell file"
+echo "Checking $seed.cell file ..."
 echo "----------------------------------------------------------------------"
 sed    -e '/^%BLOCK LATTICE/             , /^%ENDBLOCK LATTICE/             d' \
        -e '/^%BLOCK POSITIONS/           , /^%ENDBLOCK POSITIONS/           d' \
@@ -75,7 +79,7 @@ sed    -e '/^%BLOCK LATTICE/             , /^%ENDBLOCK LATTICE/             d' \
 echo "----------------------------------------------------------------------"
 
 echo
-echo "generate new cell file"
+echo "Generating new cell file"
 echo
 (
     sed -n -e '/^%BLOCK LATTICE/             , /^%ENDBLOCK LATTICE/             p' $seed.cell; echo;
@@ -88,14 +92,18 @@ echo
     echo "%BLOCK SPECIES_POT"; echo "C19"; echo "%ENDBLOCK SPECIES_POT"; echo;
 ) >> $seed.cell.temp
 
-echo "simplify Hubbard_U block"
-(
-    echo ""
-    echo "%BLOCK HUBBARD_U"
-    sed -n -e '/^%BLOCK HUBBARD_U/, /^%ENDBLOCK HUBBARD_U/p' $seed.cell  | sed '/%/,/%/!d;//d' | awk '{printf "    %s %s %.2f\n", $1, $3, $4}' | uniq
-    echo "%ENDBLOCK HUBBARD_U"
-    echo ""
-) >> $seed.cell.temp
+
+hubblock=$(sed -n -e '/^%BLOCK HUBBARD_U/, /^%ENDBLOCK HUBBARD_U/p' "$seed.cell")
+if [[ -n "$hubblock" ]]; then
+    echo "Simplifing Hubbard_U block"
+    (
+        echo ""
+        echo "%BLOCK HUBBARD_U"
+        sed -n -e '/^%BLOCK HUBBARD_U/, /^%ENDBLOCK HUBBARD_U/p' $seed.cell  | sed '/%/,/%/!d;//d' | awk '{printf "    %s %s %.2f\n", $1, $3, $4}' | uniq
+        echo "%ENDBLOCK HUBBARD_U"
+        echo ""
+    ) >> $seed.cell.temp
+fi
 
 mv $seed.cell.temp $seed.cell
 

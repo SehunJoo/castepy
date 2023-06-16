@@ -24,6 +24,7 @@ fi
 
 opt_seed='auto'
 opt_conv='false'
+opt_verbose='false'
 
 while [ $# -ge 1 ] ; do
     case $1 in
@@ -109,22 +110,28 @@ function parsing {
         task=''
         calculate_stress=''
 
-        task=$(echo "$input" | grep "type of calculation" | head -n 1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
-        calculate_stress=$(echo "$input" | grep "stress calculation" | head -n 1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
+        task=$(echo "$input" | awk -F ':' '/type of calculation/{gsub(/^ *| *$/,"",$2); print $2; exit}')
+        calculate_stress=$(echo "$input" | awk -F ':' '/stress calculation/{gsub(/^ *| *$/,"",$2); print $2; exit}')
+
+        [[ -z $task ]] && task='NaN'
+        [[ -z $calculate_stress ]] && calculate_stress='NaN'
 
         ## parse Exchange-Correlation Parameters
 
         xc_functional=''
         sedc_scheme=''
 
-        xc_functional=$(echo "$input" | grep "using functional" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
-        sedc_scheme=$(echo "$input" | grep "DFT+D: Semi-empirical dispersion correction" | head -1 | awk 'BEGIN {FS=":"} {print $NF}' | sed -e 's/^ *//g' -e 's/ *$//g')
+        xc_functional=$(awk -F ':' '/using functional/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input")
+        sedc_scheme=$(awk -F ':' '/SEDC with/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
 
         if [[ $xc_functional == 'Perdew Burke Ernzerhof' ]]; then
             xc_functional='PBE'
         elif [[ $xc_functional == 'PBE for solids (2008)' ]]; then
             xc_functional='PBESOL'
         fi
+
+        [[ -z $xc_functional ]] && xc_functional='NaN'
+        [[ -z $sedc_scheme ]] && sedc_scheme='off'
 
         ## parse Basis Set Parameters
 
@@ -133,10 +140,15 @@ function parsing {
         fine_grid_scale=''
         finite_basis_corr=''
 
-        cut_off_energy=$(echo "$input" | grep "plane wave basis set cut-off" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-        grid_scale=$(echo "$input" | grep "size of standard grid" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-        fine_grid_scale=$(echo "$input" | grep "size of   fine   grid" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-        finite_basis_corr=$(echo "$input" | grep "finite basis set correction" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        cut_off_energy=$(awk -F ':' '/plane wave basis set cut-off/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
+        grid_scale=$(awk -F ':' '/size of standard grid/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
+        fine_grid_scale=$(awk -F ':' '/size of   fine   grid/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
+        finite_basis_corr=$(awk -F ':' '/finite basis set correction/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
+
+        [[ -z $cut_off_energy ]] && cut_off_energy='NaN'
+        [[ -z $grid_scale ]] && grid_scale='NaN'
+        [[ -z $fine_grid_scale ]] && fine_grid_scale='NaN'
+        [[ -z $finite_basis_corr ]] && finite_basis_corr='NaN'
 
         ## parse Electronic Parameters
 
@@ -145,16 +157,21 @@ function parsing {
         spin_polarized=''
         nbands=''
 
-        nelectrons=$(echo "$input" | grep "number of  electrons" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-        spin=$(echo "$input" | grep "net spin   of system" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-        spin_polarized=$(echo "$input" | grep "treating system as spin-polarized" | head -1 | awk '{print $4}')
-        nbands=$(echo "$input" | grep "number of bands" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        nelectrons=$(awk -F ':' '/number of  electrons/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
+        spin=$(awk -F ':' '/net spin   of system/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
+        spin_polarized=$(awk '/treating system as spin-polarized/{print $4; exit}' <<< "$input")
+        nbands=$(awk -F ':' '/number of bands/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
 
         if [[ $spin_polarized == 'spin-polarized' ]]; then
             spin_polarized='true'
         else
             spin_polarized='false'
         fi
+
+        [[ -z $nelectrons ]] && nelectrons='NaN'
+        [[ -z $spin ]] && spin='NaN'
+        [[ -z $spin_polarized ]] && spin='NaN'
+        [[ -z $nbands ]] && nbands='NaN'
 
         ## parse Electronic Minimization Parameters
 
@@ -164,17 +181,23 @@ function parsing {
         dipole_correction=''
         dipole_dir=''
 
-        metals_method=$(echo "$input" | grep " Method" | head -1 | awk 'BEGIN {FS="with "} {print $2}' | awk 'BEGIN {FS=" treatment"} {print $1}')
-        elec_energy_tol=$(echo "$input" | grep 'total energy / atom convergence tol.' | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-        smearing_width=$(echo "$input" | grep "smearing width" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-        dipole_correction=$(echo "$input" | grep "periodic dipole correction" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
-        dipole_dir=$(echo "$input" | grep "correcting slab dipole in direction" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        metals_method=$(awk -F 'with ' '/Method/{split($2, a, " treatment"); print a[1]; exit}' <<< "$input")
+        elec_energy_tol=$(awk -F ':' '/total energy \/ atom convergence tol./{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
+        smearing_width=$(awk -F ':' '/smearing width/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
+        dipole_correction=$(awk -F ':' '/periodic dipole correction/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input")
+        dipole_dir=$(awk -F ':' '/correcting slab dipole in direction/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
+
 
         if [[ $metals_method == 'density mixing' ]]; then
             metals_method='dm'
         elif [[ $metals_method == 'ensemble DFT' ]]; then
             metals_method='edft'
         fi
+
+        [[ -z $metals_method ]] && metals_method='NaN'
+        [[ -z $elec_energy_tol ]] && elec_energy_tol='NaN'
+        [[ -z $smearing_width ]] && smearing_width='NaN'
+        [[ -z $dipole_correction ]] && dipole_correction='NaN'
         [[ -z $dipole_dir ]] && dipole_dir="NaN"
 
         ## parse Geometry Optimization Parameters
@@ -186,13 +209,19 @@ function parsing {
         geom_disp_tol=''
         geom_stress_tol=''
 
-        fixed_npw=$(echo "$input" | grep "variable cell method" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
-        geom_spin_fix=$(echo "$input" | sed -n '/^  with spin/p' | head -1 | awk 'BEGIN {FS="for all steps"} {print $1}' | awk '{print $NF}')
-        geom_energy_tol=$(echo "$input" | grep "total energy convergence tolerance" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-        geom_force_tol=$(echo "$input" | grep "max ionic |force| tolerance" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-        geom_disp_tol=$(echo "$input" | grep "max ionic |displacement| tolerance" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
-        geom_stress_tol=$(echo "$input" | grep "max |stress component| tolerance" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | awk '{print $1}')
+        fixed_npw=$(awk -F ':' '/variable cell method/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input")
+        geom_spin_fix=$(awk '/^  with spin/{print $NF; exit}' <<< "$input")
+        geom_energy_tol=$(awk -F ':' '/total energy convergence tolerance/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
+        geom_force_tol=$(awk -F ':' '/max ionic \|force\| tolerance/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
+        geom_disp_tol=$(awk -F ':' '/max ionic \|displacement\| tolerance/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
+        geom_stress_tol=$(awk -F ':' '/max \|stress component\| tolerance/{gsub(/^ *| *$/,"",$2); print $2; exit}' <<< "$input" | awk '{print $1}')
 
+        [[ -z $fixed_npw ]] && fixed_npw='NaN'
+        [[ -z $geom_spin_fix ]] && geom_spin_fix='NaN'
+        [[ -z $geom_energy_tol ]] && geom_energy_tol='NaN'
+        [[ -z $geom_force_tol ]] && geom_force_tol='NaN'
+        [[ -z $geom_disp_tol ]] && geom_disp_tol='NaN'
+        [[ -z $geom_stress_tol ]] && geom_stress_tol='NaN'
 
         ## parse Unit Cell
 
@@ -205,20 +234,32 @@ function parsing {
         volume=''
         density=''
 
-        a=$(echo "$input" | grep -w "a =" | head -n 1 | awk 'BEGIN {FS=" a ="} {print $2}' | awk '{print $1}')
-        b=$(echo "$input" | grep -w "b =" | head -n 1 | awk 'BEGIN {FS=" b ="} {print $2}' | awk '{print $1}')
-        c=$(echo "$input" | grep -w "c =" | head -n 1 | awk 'BEGIN {FS=" c ="} {print $2}' | awk '{print $1}')
-        alpha=$(echo "$input" | grep -w "alpha =" | head -n 1 | awk 'BEGIN {FS=" alpha ="} {print $2}' | awk '{print $1}')
-        beta=$(echo "$input" | grep -w "beta  =" | head -n 1 | awk 'BEGIN {FS=" beta  ="} {print $2}' | awk '{print $1}')
-        gamma=$(echo "$input" | grep -w "gamma =" | head -n 1 | awk 'BEGIN {FS=" gamma ="} {print $2}' | awk '{print $1}')
-        volume=$(echo "$input" | grep -w "volume =" | head -n 1 | awk 'BEGIN {FS="[=]"} {print $2}' | awk '{print $1}')
-        density=$(echo "$input" | grep "g/cm^3" | head -n 1 | awk 'BEGIN {FS="="} {print $2}' | awk '{print $1}')
+        a=$(awk '/a =/ {if (!a_val) {a_val = $3}} END {print a_val}' <<< "$input")
+        b=$(awk '/b =/ {if (!b_val) {b_val = $3}} END {print b_val}' <<< "$input")
+        c=$(awk '/c =/ {if (!c_val) {c_val = $3}} END {print c_val}' <<< "$input")
+        alpha=$(awk '/alpha =/ {if (!alpha_val) {alpha_val = $6}} END {print alpha_val}' <<< "$input")
+        beta=$(awk '/beta  =/ {if (!beta_val) {beta_val = $6}} END {print beta_val}' <<< "$input")
+        gamma=$(awk '/gamma =/ {if (!gamma_val) {gamma_val = $6}} END {print gamma_val}' <<< "$input")
+        volume=$(awk '/Current cell volume/ {if (!volume_val) {volume_val = $5}} END {print volume_val}' <<< "$input")
+        density=$(awk '/g\/cm\^3/ {if (!density_val) {density_val = $2}} END {print density_val}' <<< "$input")
+
+        [[ -z $a ]] && a='NaN'
+        [[ -z $b ]] && b='NaN'
+        [[ -z $c ]] && c='NaN'
+        [[ -z $alpha ]] && alpha='NaN'
+        [[ -z $beta ]] && beta='NaN'
+        [[ -z $gamma ]] && gamma='NaN'
+        [[ -z $volume ]] && volume='NaN'
+        [[ -z $density ]] && density='NaN'
+
 
         ## parse Cell Contents
 
         nions=''
 
-        nions=$(echo "$input" | grep "Total number of ions in cell" | head -1 | awk 'BEGIN {FS="="} {print $2}' | awk '{print $1}')
+        nions=$(awk -F '=' '/Total number of ions in cell/ {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}' <<< "$input")
+
+        [[ -z $nions ]] && nions='NaN'
 
         ## parse Details of Species
 
@@ -237,9 +278,11 @@ function parsing {
         kpoints_mp_grid=''
         kpoints_mp_spacing=''
 
-        kpoints_mp_grid=$(echo "$input" | grep "MP grid size for SCF calculation is" | head -1 | awk 'BEGIN {FS="is"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
-        kpoints_mp_spacing=$(grep "KPOINTS_MP_SPACING" $seed.cell | awk '{print $2}')
+        kpoints_mp_grid=$(awk -F 'is' '/MP grid size for SCF calculation is/ {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}' <<< "$input")
+        kpoints_mp_spacing=$(awk '/^KPOINTS_MP_SPACING/ {print $2}' "$seed.cell")
 
+        [[ -z $kpoints_mp_grid ]] && kpoints_mp_grid='NaN'
+        [[ -z $kpoints_mp_spacing ]] && kpoints_mp_spacing='NaN'
 
         ## parse Symmetry and Constraints
 
@@ -247,9 +290,13 @@ function parsing {
         spacegroup=''
         cell_constraints=''
 
-        symmops=$(echo "$input" | grep "Number of symmetry operations" | head -1 | awk 'BEGIN {FS="="} {print $2}' | awk '{print $1}')
-        spacegroup=$(echo "$input" | grep "Space group of crystal =" | head -1 | awk 'BEGIN {FS="[:]|[,]"} {print $2}' | awk '{print $1}')
-        cell_constraints=$(echo "$input" | grep "Cell constraints" | head -1 | awk 'BEGIN {FS=":"} {print $2}' | sed -e 's/^ *//g' -e 's/ *$//g')
+        symmops=$(awk -F '=' '/Number of symmetry operations/ {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}' <<< "$input")
+        spacegroup=$(awk -F '[:]|[,]' '/Space group of crystal =/ {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}' <<< "$input")
+        cell_constraints=$(awk -F ':' '/Cell constraints/ {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}' <<< "$input")
+
+        [[ -z $symmops ]] && symmops='NaN'
+        [[ -z $spacegroup ]] && spacegroup='NaN'
+        [[ -z $cell_constraints ]] && cell_contraints='NaN'
 
 
         ## save as tsv
@@ -358,8 +405,6 @@ function parsing {
                 printf "\n"
             ) >> data-input-cell.tsv
 
-        [[ $opt_verbose == 'true' ]] && catcsv data-input-param.tsv && echo
-        [[ $opt_verbose == 'true' ]] && catcsv data-input-cell.tsv && echo
 
         # =========================================================================================
 
@@ -408,20 +453,31 @@ function parsing {
         volume=''
         density=''
 
-        a=$(echo "$fconfig" | grep -w "a =" | tail -n 1 | awk 'BEGIN {FS=" a ="} {print $2}' | awk '{print $1}')
-        b=$(echo "$fconfig" | grep -w "b =" | tail -n 1 | awk 'BEGIN {FS=" b ="} {print $2}' | awk '{print $1}')
-        c=$(echo "$fconfig" | grep -w "c =" | tail -n 1 | awk 'BEGIN {FS=" c ="} {print $2}' | awk '{print $1}')
-        alpha=$(echo "$fconfig" | grep -w "alpha =" | tail -n 1 | awk 'BEGIN {FS=" alpha ="} {print $2}' | awk '{print $1}')
-        beta=$(echo "$fconfig" | grep -w "beta  =" | tail -n 1 | awk 'BEGIN {FS=" beta  ="} {print $2}' | awk '{print $1}')
-        gamma=$(echo "$fconfig" | grep -w "gamma =" | tail -n 1 | awk 'BEGIN {FS=" gamma ="} {print $2}' | awk '{print $1}')
-        volume=$(echo "$fconfig" | grep -w "volume =" | tail -n 1 | awk 'BEGIN {FS="[=]"} {print $2}' | awk '{print $1}')
-        density=$(echo "$fconfig" | grep "g/cm^3" | tail -n 1 | awk 'BEGIN {FS="="} {print $2}' | awk '{print $1}')
+        a=$(awk '/a =/ {a_val = $3} END {print a_val}' <<< "$fconfig")
+        b=$(awk '/b =/ {b_val = $3} END {print b_val}' <<< "$fconfig")
+        c=$(awk '/c =/ {c_val = $3} END {print c_val}' <<< "$fconfig")
+        alpha=$(awk '/alpha =/ {alpha_val = $6} END {print alpha_val}' <<< "$fconfig")
+        beta=$(awk '/beta  =/ {beta_val = $6} END {print beta_val}' <<< "$fconfig")
+        gamma=$(awk '/gamma =/ {gamma_val = $6} END {print gamma_val}' <<< "$fconfig")
+        volume=$(awk '/Current cell volume/ {volume_val = $5} END {print volume_val}' <<< "$fconfig")
+        density=$(awk '/g\/cm\^3/ {density_val = $2} END {print density_val}' <<< "$fconfig")
+
+        [[ -z $a ]] && a='NaN'
+        [[ -z $b ]] && b='NaN'
+        [[ -z $c ]] && c='NaN'
+        [[ -z $alpha ]] && alpha='NaN'
+        [[ -z $beta ]] && beta='NaN'
+        [[ -z $gamma ]] && gamma='NaN'
+        [[ -z $volume ]] && volume='NaN'
+        [[ -z $density ]] && density='NaN'
 
         # parse Enthalpy
 
         enthalpy=''
         enthalpy=$(echo "$fconfig" | grep -E -e "Final Enthalpy|corrected final free|Final free energy|Final energy" \
                    | tail -n 1 | awk 'BEGIN {FS="="} {print $2}' | awk '{printf "%.8f", $1}')
+
+        [[ -z $enthalpy ]] && enthalpy='NaN'
 
         # parse if snap_to_symmetry
 
@@ -506,7 +562,6 @@ function parsing {
                 printf "\n"                  
             ) >> data-output.tsv
 
-        [[ $opt_verbose == 'true' ]] && catcsv data-output.tsv && echo
 
         header='false'
 
@@ -525,11 +580,11 @@ function parsing {
     echo && cat data-input-cell.tsv && echo
     echo && cat data-output.tsv && echo 
 
-    echo "for pretty print..."
+    [[ $opt_verbose == 'true' ]] && echo "for pretty print..."
 
-    echo && catcsv data-input-param.tsv && echo
-    echo && catcsv data-input-cell.tsv && echo
-    echo && catcsv data-output.tsv && echo 
+    [[ $opt_verbose == 'true' ]] && echo && catcsv data-input-param.tsv && echo
+    [[ $opt_verbose == 'true' ]] && echo && catcsv data-input-cell.tsv && echo
+    [[ $opt_verbose == 'true' ]] && echo && catcsv data-output.tsv && echo 
 
 }
 

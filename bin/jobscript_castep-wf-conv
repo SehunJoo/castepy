@@ -17,14 +17,17 @@ source ~/.bashrc
 # launch program
 
 #castep-wf-conv  kpoints_mp_spacing  0.07 0.01 -0.005
-#castep-wf-conv  cut_off_energy      300  1000  50
+castep-wf-conv  cut_off_energy      300  1000  50
 #castep-wf-conv  fine_grid_scale     2.0  3.0  0.1
 
-for cut in $(seq 250 50 1000)
-do
-    sed -i "s/cut_off_energy [[:print:]]*/cut_off_energy : $cut/gi" Li-bcc.param 
-    castep-wf-conv  fine_grid_scale     2.0  3.0  0.1
-done
+
+# This loop is for testing both fine_grid_scale and cut_off_energy simultaneously
+
+#for cut in $(seq 250 50 1000)
+#do
+#    sed -i "s/cut_off_energy [[:print:]]*/cut_off_energy : $cut/gi" Ni.param 
+#    #castep-wf-conv  fine_grid_scale     2.0  3.0  0.1
+#done
 
 wait
 
