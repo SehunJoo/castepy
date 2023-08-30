@@ -26,6 +26,9 @@ case $1 in
     workfunction) # user-defined
         task=$1
         ;;
+    electrondensitydifference | edd) # user-defined
+        task=$1
+        ;;
     *)
         echo "invalid option: $1"
         usage
@@ -104,6 +107,24 @@ do
         do
             sed -n "/^$key/p" $seed.param
         done
+
+    elif [[ $task == "electrondensitydifference" || $task == "edd" ]]
+    then
+        # work function calculation
+        # seed.cst_esp : electrostatic potential data
+        # seed.bands   : Fermi energy
+
+        mkdir subset1
+        cp $seed.cell  ./subset1/${seed}_Subset1.cell
+        cp $seed.param ./subset1/${seed}_Subset1.param
+        cp jobscript*  ./subset1
+        sed -i -e '/^%BLOCK [Ii][Oo][Nn][Ii][Cc]_[Cc]*/, /^%ENDBLOCK [Ii][Oo][Nn][Ii][Cc]_[Cc]*/d' ./subset1/${seed}_Subset1.cell
+
+        mkdir subset2
+        cp $seed.cell  ./subset2/${seed}_Subset2.cell
+        cp $seed.param ./subset2/${seed}_Subset2.param
+        cp jobscript*  ./subset2
+        sed -i -e '/^%BLOCK [Ii][Oo][Nn][Ii][Cc]_[Cc]*/, /^%ENDBLOCK [Ii][Oo][Nn][Ii][Cc]_[Cc]*/d' ./subset2/${seed}_Subset2.cell
 
     elif [[ $task == "geometryoptimization" ]]
     then

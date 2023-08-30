@@ -17,16 +17,24 @@ def mp_example():
 # get mpids
 
 def get_mpids_formula(formula):
-    #docs = mpr.summary.search(formula=formula, fields=["material_id"])
+    docs = mpr.summary.search(formula=formula, fields=["material_id"])
     #docs = mpr.summary.search(formula=formula, is_stable=True, fields=["material_id"])
-    docs = mpr.summary.search(formula=formula, theoretical=False, fields=["material_id"])
+    #docs = mpr.summary.search(formula=formula, theoretical=False, fields=["material_id"])
     return [doc.material_id for doc in docs]
-    
+
 def get_mpids_elements(elements):
-    #docs = mpr.summary.search(elements=elements, fields=["material_id"])
-    docs = mpr.summary.search(elements=elements, is_stable=True, fields=["material_id"])
-    #docs = mpr.summary.search(elements=elements, theoretical=False, fields=["material_id"])
+    elements = elements
+    chemsys = "-".join(elements)
+
+    docs = mpr.summary.search(elements=elements, chemsys=chemsys, fields=["material_id", "formula_pretty"])
+    #docs = mpr.summary.search(elements=elements, chemsys=chemsys, is_stable=True, fields=["material_id", "formula_pretty"])
+    #docs = mpr.summary.search(elements=elements, chemsys=chemsys, theoretical=False, fields=["material_id", "formula_pretty])
+
+    formulas = [doc.formula_pretty for doc in docs]
+    print(len(docs), "structures found ...")
+    print(list(set(formulas)))
     return [doc.material_id for doc in docs]
+  
 
 
 # to query summary data with Materials Project IDs
@@ -57,4 +65,4 @@ def get_structures(mpids):
 
 mp_fields()
 mp_example()
-get_structures(get_mpids_formula(["Ni"]))
+get_structures(get_mpids_elements(["Co","O"]))
