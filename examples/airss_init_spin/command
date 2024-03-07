@@ -1,0 +1,2 @@
+buildcell < LiNiO2.cell > LiNiO2-unique.cell 2>/dev/null
+cas-input.py -m 'airss_spin' -s LiNiO2-unique

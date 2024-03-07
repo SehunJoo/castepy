@@ -1,7 +1,0 @@
-#!/bin/bash
-
-set -e
-
-rm -rf castep.*
-rm -rf DONE_*
-rm -rf .spawnpids*
