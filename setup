@@ -3,8 +3,8 @@
 set -e
 
 
-echo "export CASSCR=$(pwd)/bin" >> ~/.bashrc
-echo "export PATH=\$CASSCR:\$PATH" >> ~/.bashrc
+echo "export CASPY=$(pwd)/bin" >> ~/.bashrc
+echo "export PATH=\$CASPY:\$PATH" >> ~/.bashrc
 source ~/.bashrc
 
 exit 0

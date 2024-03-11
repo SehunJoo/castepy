@@ -39,7 +39,7 @@ class Param:
         param = {}
         with open(f"{seed}.param", 'r') as f:
             for line in f:
-                if not line.strip() or line.strip().startswith('#'):
+                if not line.strip() or line.strip().startswith('#') or ':' not in line:
                     continue
                 keyword, value = line.split(':', 1)
                 value = value.split()[0] if value.split() else ''
