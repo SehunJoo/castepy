@@ -15,8 +15,8 @@ class Cell():
                     [f"%BLOCK {k.upper()}", *v, f"%ENDBLOCK {k.upper()}"]
                 ))
             else:
-                if k in ['fix_all_ions', 'fix_com', 'fix_all_cell', 'fix_vol']:
-                    lines.append(f"{k.upper()}")
+                if k in ['fix_all_cell', 'fix_vol', 'fix_com']:
+                    lines.append(f"{k.upper()} : {v}")
                 else:
                     lines.append(f"{k.upper()} {v}")
             lines.append("")
@@ -30,6 +30,7 @@ class Cell():
         with open(filename, 'r') as f:
             lines = iter(f.readlines())
 
+            # covert to lowercase except elements
             for line in lines:
                 temp = line.strip()
                 if not temp or temp.startswith('#'):
@@ -46,9 +47,16 @@ class Cell():
                         else:
                             cell[keyword].append(temp)
                 else:
-                    tokens = temp.split()
-                    key = tokens[0].lower()
-                    value = tokens[1] if len(tokens) > 1 else ""
+                    temp = temp.lower()
+                    tokens = temp.split(':', maxsplit=1)
+                    print(tokens)
+                    if len(tokens) > 1:
+                        key = tokens[0].strip()
+                        value = tokens[1].strip()
+                    else:
+                        tokens = temp.split()
+                        key = tokens[0].strip()
+                        value = tokens[1].strip() if len(tokens) > 1 else ""
                     cell[key] = value
 
         return cls(seed=seed, cell=cell)
