@@ -179,12 +179,17 @@ class Cell():
             self.cell.pop('species_lcao_states', None)
 
     def set_spin(self, option='mp'):
+        d_block_3d = ['Sc','Ti','V','Cr','Mn','Fe','Co','Ni','Cu','Zn']
+        d_block_4d = ['Y','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd']
+        d_block_5d = ['La','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg']
+        d_block = d_block_3d + d_block_4d + d_block_5d
+
         for i, atom in enumerate(self.cell['positions_frac']):
             tokens = atom.split()
             element = tokens[0]
 
             if option == 'mp':
-                if element in ["Ni"]:
+                if element in d_block:
                     spin = 5.0
                 else:
                     spin = 0.6
