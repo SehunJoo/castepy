@@ -18,7 +18,7 @@ class Param:
         )
         return "\n".join([
             f"{k:30s} : {v}" for k, v in items_sorted
-        ]) + "\n"
+        ]) + "\n\n%block devel_code\nno_improve_wvfn\n%endblock devel_code" + "\n"
 
 
     @ classmethod
