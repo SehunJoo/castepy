@@ -114,36 +114,67 @@ class Param:
         quality: str = 'normal'
     ):
         """
-        If SCF convergence truns out to be very slow or failed,
-        If the convergence failed, please try this
-        The optimal mixing parameters depends very much on the system.
-        For metals, thie parameter usually has to be rather small, e.g. 0.02
+        If SCF convergence truns out to be very slow or failed, please change this
+
+        Mixing paramters:
+            mixing amplitude: A / mix_*_amp (CASTEP) / AMIX_* (VASP)
+            cutoff wave vector: Gmax / mix_*_gmax (CASTEP) / BMIX_* (VASP)
+
+        Mixing amplitude:
+            The optimal mixing parameters depends very much on the system.
+            For metals, this parameter usually has to be rather small, e.g. 0.02
+
+        Cutoff wave vector:
+            recommend to change only this and keep mixing amplitude fixed
+
+        Reference:
+            https://www.tcm.phy.cam.ac.uk/castep/documentation/WebHelp/content/modules/castep/thcastepselfelec.htm
+            https://www.vasp.at/wiki/index.php/IMIX
         """
 
         if quality == "default-castep":
             self.param.update({
                 'metals_method': 'dm',
                 'mix_charge_amp': 0.8,
-                'mix_spin_amp': 2.0
+                'mix_charge_gmax': 1.5,
+                'mix_spin_amp': 2.0,
+                'mix_spin_gmax': 1.5
             })
         elif quality == "default-ms":
             self.param.update({
                 'metals_method': 'dm',
                 'mix_charge_amp': 0.5,
-                'mix_spin_amp': 2.0
+                'mix_charge_gmax': 1.5,
+                'mix_spin_amp': 2.0,
+                'mix_spin_gmax': 1.5
             })
         elif quality == "default-vasp":
             # AMIX, AMIX_MAG
             self.param.update({
                 'metals_method': 'dm',
                 'mix_charge_amp': 0.4,
-                'mix_spin_amp': 1.6
+                'mix_charge_gmax': 1.0,
+                'mix_spin_amp': 1.6,
+                'mix_spin_gmax': 1.0
+            })
+        elif quality == "default-vasp-faster":
+            # for slabs, magnetic systems and insulating systems
+            # (e.g. molecules and clusters), an initial "linear mixing" can
+            # result in faster convergence than the Kerker model function.
+            self.param.update({
+                'metals_method': 'dm',
+                'mix_charge_amp': 0.2,
+                'mix_charge_gmax': 0.0001,
+                'mix_spin_amp': 0.8,
+                'mix_spin_gmax': 0.0001
             })
         elif quality == "normal":
             self.param.update({
                 'metals_method': 'dm',
                 'mix_charge_amp': 0.2,
-                'mix_spin_amp': 0.8
+                'mix_charge_gmax': 1.0,
+                'mix_spin_amp': 0.8,
+                'mix_spin_gmax': 1.0
             })
         elif quality == "edft":
             self.param.update({'metals_method', 'edft'})
