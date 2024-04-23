@@ -12,8 +12,12 @@ class Param:
 
 
     def __str__(self):
+        items_sorted = sorted(
+            self.param.items(),
+            key=lambda item: (item[0].startswith('write'), item[0].startswith('calculate'))
+        )
         return "\n".join([
-            f"{k:30s} : {v}" for k, v in self.param.items()
+            f"{k:30s} : {v}" for k, v in items_sorted
         ]) + "\n"
 
 
@@ -101,10 +105,12 @@ class Param:
             f"{k:30s} : {v}" for k, v in self.param.items() if k in keys
         ]) + "\n"
 
-
-    def to_file(self):
-        with open(f"{self.seed}.param", "w") as f:
-            f.write(str(self))
+                                                                                                                        
+    def to_file(self, filename: str | None = None):                                                                     
+        if filename == None:                                                                                            
+            filename = f"{self.seed}.param"                                                                              
+        with open(filename, 'w') as f:                                                                                  
+            f.write(str(self))         
 
     def as_dict(self):
         return self.param

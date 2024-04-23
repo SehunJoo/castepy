@@ -17,17 +17,16 @@ def get_args():
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="Retrieve structures from Materials Project database",
+        description="Update CASTEP input files",
         epilog="examples:\n"
-               "    mp_query.py -el Li,Ni,O\n"
-               "    mp_query.py -el Li,Ni,O -in 20\n"
+               "    cas-input.py -s Li -m clean\n"
     )
     parser.add_argument('-s', '--seed', type=str, dest='seed',
                         default=None,
                         help='seed')
     parser.add_argument('-m', '--mode', type=str, dest='mode',
-                        default='airss_spin',
-                        help='Nmode')
+                        default='clean',
+                        help='mode')
 
     args = parser.parse_args()
 
@@ -103,6 +102,10 @@ def ms_surface(seed):
 def cell_clean(seed):
     cell = Cell.from_seed(seed)
     cell.to_file(seed + '-clean.cell')
+
+def param_clean(seed):
+    param = Param.from_seed(seed)
+    param.to_file(seed + '-clean.param')
 
 def cell_cellopt(seed):
     cell = Cell.from_seed(seed)
@@ -222,6 +225,9 @@ if __name__ == "__main__":
 
     elif args.mode == "ms_surface":
         ms_surface(seed)
+
+    elif args.mode == "clean":
+        param_clean(seed)
 
     #test_geom_tol(seed)
     #test_set_restart(seed)
