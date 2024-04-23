@@ -81,6 +81,7 @@ class Param:
             'write_geom': 'false',
             'bs_write_eigenvalues': 'false',
             'calculate_stress': 'true',
+            'perc_extra_bands': '100',
         }
         return cls(seed='gencell', param=param)
 
