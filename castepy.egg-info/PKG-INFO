@@ -1,0 +1,10 @@
+Metadata-Version: 2.1
+Name: castepy
+Version: 0.0.1
+Summary: Python package for CASTEP
+Author: Se Hun Joo
+Author-email: shjoo.lab@gmail.com
+Requires-Dist: ase
+Requires-Dist: matplotlib
+Requires-Dist: numpy
+Requires-Dist: pandas

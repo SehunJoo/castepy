@@ -1,0 +1,7 @@
+README.md
+setup.py
+castepy.egg-info/PKG-INFO
+castepy.egg-info/SOURCES.txt
+castepy.egg-info/dependency_links.txt
+castepy.egg-info/requires.txt
+castepy.egg-info/top_level.txt
