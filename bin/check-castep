@@ -1,0 +1,20 @@
+#!/bin/bash
+
+set -e
+
+echo -e "\ncheck errors\n"
+
+grep -i warning *.castep \
+    | grep -v 'warnings during this run' \
+    | grep -v 'doing cell minimisation without finite basis correction' \
+    | awk -F: '{line=$0; sub(/^[^:]*:/, "", line); printf "%-60s %s\n", $1, line}' \
+    | sort -k1 \
+    | uniq
+    
+
+
+echo -e "\ngeom steps\n"
+
+grep -H 'finished iteration' *.castep \
+    | awk -F: '{last[$1]=$3} END {for (file in last) printf "%-60s %s\n", file, last[file]}' \
+    | sort -k1

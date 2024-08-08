@@ -1,0 +1,25 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "castepy"
+version = "0.0.1"
+authors = [{name = "Se Hun Joo", email = "shj29@cam.ac.uk"}]
+readme = "README.md"
+license = {file = "LICENSE"}
+description = "Python scripts for CASTEP"
+requires-python = ">=3.10"
+
+dependencies = [
+    "numpy",
+    "pandas",
+    "ase",
+    "pymatgen"
+]
+
+[project.scripts]
+build-2dpes = "castepy.cli.build_2dpes:main"
+
+[project.urls]
+Home = "https://github.com/SehunJoo/castepy"

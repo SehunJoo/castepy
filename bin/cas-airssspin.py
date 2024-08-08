@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import sys
-from cell import Cell
-from param import Param
+from castepy.cell import Cell
+from castepy.param import Param
 
 
 #===============================================================================

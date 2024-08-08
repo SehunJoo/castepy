@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import os
+
 
 class Cell():
 
@@ -39,6 +41,7 @@ class Cell():
                     continue
 
                 if temp.lower().startswith('%block'):
+                    # get block keywords
                     keyword = line.lower().split()[1]
                     cell[keyword] = []
 
@@ -53,12 +56,14 @@ class Cell():
                     tokens = temp.split(':', maxsplit=1)
                     print(tokens)
                     if len(tokens) > 1:
+                        # get keywords : fix_all_cell, fix_com
                         key = tokens[0].strip()
                         value = tokens[1].strip()
                     else:
+                        # get keywords : symmetry_generate, snap_to_symmetry
                         tokens = temp.split()
                         key = tokens[0].strip()
-                        value = tokens[1:].strip() if len(tokens) > 1 else ""
+                        value = " ".join(tokens[1:]).strip() if len(tokens) > 1 else ""
                     cell[key] = value
 
         return cls(seed=seed, cell=cell)
@@ -186,6 +191,24 @@ class Cell():
         d_block_5d = ['La','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg']
         d_block = d_block_3d + d_block_4d + d_block_5d
 
+        filename = f'{self.seed}.spin'
+        # airss & crud
+        if not os.path.exists(filename):
+            root = self.seed.split('-')[0]
+            filename = f'{root}.spin'
+
+        spinfile = {}
+        if os.path.exists(filename):
+            print(filename)
+            with open(filename, 'r') as f:
+                lines = f.readlines()
+                for line in lines:
+                    tokens = line.split(':', maxsplit=1)
+                    if len(tokens) > 1:
+                        key = tokens[0].strip()
+                        value = tokens[1].strip()
+                        spinfile[key] = value
+
         for i, atom in enumerate(self.cell['positions_frac']):
             tokens = atom.split()
             element = tokens[0]
@@ -195,6 +218,11 @@ class Cell():
                     spin = 5.0
                 else:
                     spin = 0.6
+
+            if spinfile:
+                if element in spinfile:
+                    spin = spinfile[element]
+                
 
             if not 'SPIN' in atom:
                 self.cell['positions_frac'][i] = atom + f' SPIN={spin}'
